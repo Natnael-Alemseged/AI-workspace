@@ -72,7 +72,7 @@ GITHUB_CLIENT_ID: str = config("GITHUB_CLIENT_ID", default="")
 GITHUB_CLIENT_SECRET: str = config("GITHUB_CLIENT_SECRET", default="")
 
 # CORS configuration for OAuth
-ALLOWED_ORIGINS: list[str] = config("ALLOWED_ORIGINS", cast=lambda v: v.split(",") if v else ["http://localhost:3000", "http://localhost:8080"], default="http://localhost:3000,http://localhost:8080")
+ALLOWED_ORIGINS: list[str] = config("ALLOWED_ORIGINS", cast=lambda v: v.split(",") if v else ["http://localhost:3000", "http://localhost:8080","https://armada-den-frontend.vercel.app"], default="http://localhost:3000,http://localhost:8080,https://armada-den-frontend.vercel.app")
 
 # OpenAI Configuration
 OPENAI_API_KEY: str = config("OPENAI_API_KEY", default="")
