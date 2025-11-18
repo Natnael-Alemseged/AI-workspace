@@ -46,6 +46,7 @@ composio-openai = "==0.9.1"
 composio-agno = "==0.7.20"
 composio-llamaindex = "==0.9.1"
 asyncpg = "^0.30.0"
+itsdangerous = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.2"
