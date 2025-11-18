@@ -1,37 +1,60 @@
-from collections.abc import AsyncIterator
+# app/db.py
 
-from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.orm import declarative_base
+from typing import AsyncIterator
+import os
 
-from app.core.config import ASYNC_DATABASE_URL, DATABASE_URL
+from app.core.config import ASYNC_DATABASE_URL
+from app.core.logging import logger
 
-# For SQLite, use StaticPool to avoid connection issues
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
-else:
-    engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# === FINAL PRODUCTION-READY NEON + HEROKU CONFIG ===
+# Fix URL + add critical connection options
+db_url = ASYNC_DATABASE_URL
 
-if ASYNC_DATABASE_URL.startswith("sqlite"):
-    async_engine = create_async_engine(ASYNC_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
-else:
-    async_engine = create_async_engine(ASYNC_DATABASE_URL)
-AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False)
+# Ensure correct driver
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
 
-# Export for background tasks
-async_session_maker = AsyncSessionLocal
+# Add sslmode=require for Neon (mandatory)
+if "neon.tech" in db_url:
+    separator = "&" if "?" in db_url else "?"
+    db_url += f"{separator}sslmode=require"
+
+# Create engine with production-safe settings
+async_engine = create_async_engine(
+    db_url,
+    echo=False,
+    future=True,
+    pool_pre_ping=True,                    # Critical: detects dead connections
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    connect_args={
+        "server_settings": {"jit": "off"},  # Speeds up first query after idle
+        "timeout": 10,
+    },
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    bind=async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False,
+)
 
 Base = declarative_base()
 
 
 async def get_async_session() -> AsyncIterator[AsyncSession]:
-    from app.core.logging import logger
-    try:
-        async with AsyncSessionLocal() as session:
-            logger.debug("Async session created successfully")
+    async with AsyncSessionLocal() as session:
+        try:
+            logger.debug("Async DB session opened")
             yield session
-    except Exception as e:
-        logger.error(f"Failed to create async session: {e}")
-        raise
+        except Exception as exc:
+            logger.error(f"Database session error: {exc}", exc_info=True)
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
