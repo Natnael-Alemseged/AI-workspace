@@ -1055,19 +1055,18 @@ tools = ["diskcache", "flake8", "networkx", "pathspec", "pygments", "ruff", "tra
 
 [[package]]
 name = "composio-llamaindex"
-version = "0.7.20"
-description = "Use Composio to get an array of tools with your LlamaIndex agent."
+version = "0.9.1"
+description = "Use Composio to get array of tools with LlamaIndex Agent Workflows."
 optional = false
 python-versions = "<4,>=3.9"
 groups = ["main"]
 files = [
-    {file = "composio_llamaindex-0.7.20-py3-none-any.whl", hash = "sha256:dbe49869f2c7bbde29f8bebf55f28ecc29c3eab7ecc8862ce0fb08d39d364ffd"},
-    {file = "composio_llamaindex-0.7.20.tar.gz", hash = "sha256:69a36c1621212bd8a1d6fdc644e21c130f618a06c6225ff2e6aa50e65d8fa4ac"},
+    {file = "composio_llamaindex-0.9.1-py3-none-any.whl", hash = "sha256:4a3fb776cf0ea0974eac7250898821d0f9295f56ba068316ece2971909311581"},
+    {file = "composio_llamaindex-0.9.1.tar.gz", hash = "sha256:18367d378e1b6e49dfc1d8a148cb2f41cc7561d3bf8048e1ea61f54399c979a9"},
 ]
 
 [package.dependencies]
-composio_core = ">=0.7.0,<0.8.0"
-llama_index = ">=0.10.43"
+llama_index = "*"
 
 [[package]]
 name = "composio-openai"
@@ -6137,4 +6136,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "2827ac10ee4e97213d504f5ced06a37d4e370943239c5b46b298bffef76bda6c"
+content-hash = "138549fc6eb3b5e0c5915fca41f420d7e372fb76ad54edc95f1d3a880c40bc36"
