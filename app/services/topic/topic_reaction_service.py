@@ -20,18 +20,23 @@ class TopicReactionService:
     ) -> MessageReaction:
         """Add a reaction to a message."""
         try:
-            # Check if reaction already exists
+            # Check if reaction already exists for this user and message
             existing_query = select(MessageReaction).where(
                 and_(
                     MessageReaction.message_id == message_id,
-                    MessageReaction.user_id == user_id,
-                    MessageReaction.emoji == emoji
+                    MessageReaction.user_id == user_id
                 )
             )
             existing_result = await session.execute(existing_query)
             existing_reaction = existing_result.scalar_one_or_none()
             
             if existing_reaction:
+                # Update existing reaction
+                if existing_reaction.emoji != emoji:
+                    existing_reaction.emoji = emoji
+                    await session.commit()
+                    await session.refresh(existing_reaction)
+                    logger.info(f"Reaction updated: {emoji} for message {message_id} by user {user_id}")
                 return existing_reaction
             
             # Create reaction

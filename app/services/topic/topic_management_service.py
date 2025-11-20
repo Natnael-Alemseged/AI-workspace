@@ -227,6 +227,50 @@ class TopicManagementService:
             result = await session.execute(query)
             topics = result.scalars().unique().all()
             
+            # Calculate unread_count for each topic efficiently
+            if topics:
+                from app.models.channel import TopicMessage
+                from sqlalchemy import case, literal_column
+                
+                # Get last_read_at for each topic for this user
+                topic_ids = [topic.id for topic in topics]
+                
+                # Single optimized query to calculate unread counts for all topics
+                # Uses a subquery to join topic_members and count messages conditionally
+                unread_subquery = (
+                    select(
+                        TopicMessage.topic_id,
+                        func.sum(
+                            case(
+                                # If last_read_at is NULL or message is after last_read_at, count it
+                                (
+                                    (TopicMember.last_read_at == None) | 
+                                    (TopicMessage.created_at > TopicMember.last_read_at),
+                                    1
+                                ),
+                                else_=0
+                            )
+                        ).label('unread_count')
+                    )
+                    .select_from(TopicMessage)
+                    .outerjoin(
+                        TopicMember,
+                        and_(
+                            TopicMessage.topic_id == TopicMember.topic_id,
+                            TopicMember.user_id == user_id
+                        )
+                    )
+                    .where(TopicMessage.topic_id.in_(topic_ids))
+                    .group_by(TopicMessage.topic_id)
+                )
+                
+                unread_result = await session.execute(unread_subquery)
+                unread_counts = {row[0]: row[1] or 0 for row in unread_result.all()}
+                
+                # Set unread_count for each topic
+                for topic in topics:
+                    topic.unread_count = unread_counts.get(topic.id, 0)
+            
             return list(topics), total
             
         except Exception as e:
