@@ -244,7 +244,7 @@ async def process_ai_topic_response(
         agent_type: Type of AI agent (emailAi, searchAi, etc.)
         user_name: User's display name
     """
-    from app.db import async_session_maker
+    from app.db import AsyncSessionLocal
     from app.services.topic.topic_message_service import TopicMessageService
     
     try:
@@ -269,7 +269,7 @@ async def process_ai_topic_response(
         )
         
         # Create new session for background task
-        async with async_session_maker() as session:
+        async with AsyncSessionLocal() as session:
             # Create AI response as a REPLY to the user's message
             ai_message = await TopicMessageService.create_ai_message(
                 session,

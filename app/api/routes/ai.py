@@ -219,7 +219,7 @@ async def process_ai_email_response(
         content: Email content
         user_name: User's display name
     """
-    from app.db import async_session_maker
+    from app.db import AsyncSessionLocal
     
     try:
         # Show "AI is typing" indicator
@@ -243,7 +243,7 @@ async def process_ai_email_response(
         )
         
         # Create new session for background task
-        async with async_session_maker() as session:
+        async with AsyncSessionLocal() as session:
             # Create AI response as a REPLY to the user's message
             ai_message = await ChatService.create_ai_message(
                 session,
