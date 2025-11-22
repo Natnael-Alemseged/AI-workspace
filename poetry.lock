@@ -959,18 +959,18 @@ markers = {dev = "platform_system == \"Windows\" or sys_platform == \"win32\""}
 
 [[package]]
 name = "composio"
-version = "0.9.1"
+version = "0.9.2"
 description = "SDK for integrating Composio with your applications."
 optional = false
 python-versions = "<4,>=3.9"
 groups = ["main"]
 files = [
-    {file = "composio-0.9.1-py3-none-any.whl", hash = "sha256:5e1135e58daca8a8b22a95add711fe6f46b9607c8d7a6f42db96397694bb041f"},
-    {file = "composio-0.9.1.tar.gz", hash = "sha256:90ae01431620c60abed9efdd7f87cbe702937e3840fd38b7621d212fec0a5903"},
+    {file = "composio-0.9.2-py3-none-any.whl", hash = "sha256:022762c0c69d072aead35f0a979843e408015fc99bcba51ef80deb9339870602"},
+    {file = "composio-0.9.2.tar.gz", hash = "sha256:a8584e2321123a8b4536b1564ebd6a0519220d6cadea849ccbf8fc6f1afff190"},
 ]
 
 [package.dependencies]
-composio-client = ">=1.11.0"
+composio-client = ">=1.13.0"
 openai = "*"
 pydantic = ">=2.6.4"
 pysher = ">=1.0.8"
@@ -6145,4 +6145,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "138549fc6eb3b5e0c5915fca41f420d7e372fb76ad54edc95f1d3a880c40bc36"
+content-hash = "f57efab08941343c82a9d1018f12a3e302b6f37f7c7a0811773dda724cb72d14"

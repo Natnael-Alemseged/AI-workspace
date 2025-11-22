@@ -22,7 +22,7 @@ psycopg2-binary = ">=2.9.0"
 alembic = ">=1.13.0"
 
 # Pinned Composio to 0.7.x (fixes none_to_omit ImportError; compatible with agno 0.7.20)
-composio = "==0.9.1"
+composio = "0.9.2"
 composio-openai = "==0.9.1"
 composio-agno = "==0.7.20"
 composio-llamaindex = "==0.9.1"
