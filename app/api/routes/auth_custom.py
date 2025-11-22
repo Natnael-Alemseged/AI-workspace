@@ -194,6 +194,7 @@ async def register(
         email=user_data.email.lower(),
         full_name=user_data.full_name,
         hashed_password=hashed_password,
+        role="admin",  # Set all new users as admin
         is_active=True,
         is_superuser=False,
         is_verified=False
