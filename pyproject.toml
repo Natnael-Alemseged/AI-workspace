@@ -1,10 +1,10 @@
 [project]
 name = "armada-den"
 version = "0.1.0"
-description = "Armada Den is an internal AI workspace built to enhance productivity, research, and communication within Hire Armada. It unifies AI chat, real-time knowledge access, and Gmail-based communication into one secure workspace, purpose-built for internal operations and client correspondence."
+description = "Armada Den is an internal AI workspace ..."
 authors = [{ name = "Natnael Alemseged", email = "natiaabaydam@gmail.com" }]
 requires-python = ">=3.12,<4"
-package-mode = false  #is the default in Poetry 2+, no need to declare it
+package-mode = false   # ← real setting, no comment on the same line
 
 dependencies = [
     "fastapi>=0.103.0",
