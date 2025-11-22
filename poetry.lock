@@ -2183,6 +2183,18 @@ colors = ["colorama"]
 plugins = ["setuptools"]
 
 [[package]]
+name = "itsdangerous"
+version = "2.2.0"
+description = "Safely pass data to untrusted environments and back."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "itsdangerous-2.2.0-py3-none-any.whl", hash = "sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef"},
+    {file = "itsdangerous-2.2.0.tar.gz", hash = "sha256:e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173"},
+]
+
+[[package]]
 name = "jedi"
 version = "0.19.2"
 description = "An autocompletion tool for Python that can be used for text editors."
@@ -4366,6 +4378,7 @@ files = [
 ]
 
 [package.dependencies]
+aiohttp = {version = ">=3.4", optional = true, markers = "extra == \"asyncio-client\""}
 bidict = ">=0.21.0"
 python-engineio = ">=4.11.0"
 
@@ -6209,4 +6222,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "18d3e93c71d33391e74d0ebc3ed57d89a6a0aebeb537cef784a20259a2b64637"
+content-hash = "10d094239506ae70913c2d09959751ebe40db6145749fb2622e21aeb1f9ad4d9"
