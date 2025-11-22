@@ -21,6 +21,9 @@ parsed = urllib.parse.urlparse(db_url)
 query_params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
 query_params.pop("sslmode", None)  # Remove sslmode if present
 
+
+
+
 # Rebuild clean URL without sslmode parameter
 clean_url = urllib.parse.urlunparse((
     parsed.scheme,
