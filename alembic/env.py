@@ -11,7 +11,11 @@ from app.db import Base
 from app.models import (
     User, OAuthAccount, Conversation, Message, MessageCitation,
     MemoryChunk, WebSearchQuery, GmailDraft, EmailAttachment,
-    AIAction, AuditLog
+    AIAction, AuditLog, PushSubscription
+)
+from app.models.channel import (
+    Channel, Topic, TopicMember, TopicMessage,
+    MessageMention, MessageReaction
 )
 
 # this is the Alembic Config object, which provides

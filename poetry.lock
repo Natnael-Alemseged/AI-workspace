@@ -1930,6 +1930,20 @@ files = [
 ]
 
 [[package]]
+name = "http-ece"
+version = "1.2.1"
+description = "Encrypted Content Encoding for HTTP"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "http_ece-1.2.1.tar.gz", hash = "sha256:8c6ab23116bbf6affda894acfd5f2ca0fb8facbcbb72121c11c75c33e7ce8cff"},
+]
+
+[package.dependencies]
+cryptography = ">=2.5"
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 description = "A minimal low-level HTTP client."
@@ -3889,6 +3903,21 @@ argon2 = ["argon2-cffi (>=23.1.0,<24)"]
 bcrypt = ["bcrypt (>=4.1.2,<5)"]
 
 [[package]]
+name = "py-vapid"
+version = "1.9.2"
+description = "Simple VAPID header generation library"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "py_vapid-1.9.2-py3-none-any.whl", hash = "sha256:4ccf8a00fc54f1f99f66fb543c96f2c82622508ad814b6e9225f2c26948934d7"},
+    {file = "py_vapid-1.9.2.tar.gz", hash = "sha256:3c8973b6cf8384ad0c9ae64d6270ccc480e0b92c702d8f5ea2cc03e6b51247f9"},
+]
+
+[package.dependencies]
+cryptography = ">=2.5"
+
+[[package]]
 name = "pyasn1"
 version = "0.6.1"
 description = "Pure-Python implementation of ASN.1 types and DER/BER/CER codecs (X.208)"
@@ -4414,6 +4443,25 @@ files = [
     {file = "pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00"},
     {file = "pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3"},
 ]
+
+[[package]]
+name = "pywebpush"
+version = "1.14.1"
+description = "WebPush publication library"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "pywebpush-1.14.1-py3-none-any.whl", hash = "sha256:2865ee65cf44375f7cbdcfd5ba915a9d84c239900c6fba2245efd8d8314a3e84"},
+    {file = "pywebpush-1.14.1.tar.gz", hash = "sha256:f88d7e2bf5e87c616dfb04b8c95c119238c511659b02f735ee77cc16842855ee"},
+]
+
+[package.dependencies]
+cryptography = ">=2.6.1"
+http-ece = ">=1.1.0"
+py-vapid = ">=1.7.0"
+requests = ">=2.21.0"
+six = ">=1.15.0"
 
 [[package]]
 name = "pyyaml"
@@ -6222,4 +6270,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "10d094239506ae70913c2d09959751ebe40db6145749fb2622e21aeb1f9ad4d9"
+content-hash = "eccd6beabdef69a796b363001a27b6105c47ce7888adb62fb296fa65d74c3868"

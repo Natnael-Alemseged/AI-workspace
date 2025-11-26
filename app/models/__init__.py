@@ -22,7 +22,7 @@ from app.models.conversation import Conversation
 from app.models.gmail import EmailAttachment, GmailDraft, GmailDraftStatus
 from app.models.memory import MemoryChunk, SourceType
 from app.models.message import ContentType, Message, MessageCitation, MessageRole
-from app.models.user import OAuthAccount, User, UserRole
+from app.models.user import OAuthAccount, PushSubscription, User, UserRole
 from app.models.web_search import WebSearchEngine, WebSearchQuery
 
 __all__ = [
@@ -30,6 +30,7 @@ __all__ = [
     "User",
     "UserRole",
     "OAuthAccount",
+    "PushSubscription",
     # Conversation models
     "Conversation",
     "Message",

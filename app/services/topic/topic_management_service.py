@@ -352,3 +352,80 @@ class TopicManagementService:
             await session.rollback()
             logger.error(f"Error updating topic: {e}")
             raise
+
+    @staticmethod
+    async def delete_topic_by_id(
+        session: AsyncSession,
+        topic_id: UUID,
+        user_id: UUID
+    ) -> bool:
+        """
+        Delete a topic and all its associated messages (admin only).
+        
+        Args:
+            session: Database session
+            topic_id: ID of the topic to delete
+            user_id: ID of the admin requesting deletion
+            
+        Returns:
+            True if topic was deleted, False if not found
+            
+        Raises:
+            ValueError: If user is not an admin
+        """
+        try:
+            # Verify admin
+            is_admin = await TopicManagementService.verify_admin(session, user_id)
+            if not is_admin:
+                raise ValueError("Only admins can delete topics")
+            
+            # Get topic
+            query = select(Topic).where(Topic.id == topic_id)
+            result = await session.execute(query)
+            topic = result.scalar_one_or_none()
+            
+            if not topic:
+                return False
+            
+            # Import TopicMessage model
+            from app.models.channel import TopicMessage
+            
+            # Delete all messages in the topic (cascade will handle mentions and reactions)
+            delete_messages_query = select(TopicMessage).where(TopicMessage.topic_id == topic_id)
+            messages_result = await session.execute(delete_messages_query)
+            messages = messages_result.scalars().all()
+            
+            for message in messages:
+                await session.delete(message)
+            
+            logger.info(f"Deleted {len(messages)} messages from topic {topic_id}")
+            
+            # Delete all topic members
+            delete_members_query = select(TopicMember).where(TopicMember.topic_id == topic_id)
+            members_result = await session.execute(delete_members_query)
+            members = members_result.scalars().all()
+            
+            for member in members:
+                await session.delete(member)
+            
+            logger.info(f"Deleted {len(members)} members from topic {topic_id}")
+            
+            # Delete the topic itself
+            await session.delete(topic)
+            
+            await session.commit()
+            
+            logger.info(f"Topic deleted: {topic_id} by admin {user_id}")
+            return True
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error deleting topic: {e}")
+            raise
+
+
+
+
+

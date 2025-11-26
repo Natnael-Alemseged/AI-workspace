@@ -120,6 +120,45 @@ async def get_my_topics(
             detail="Failed to get topics"
         )
 
+@router.delete("/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_topic(
+    topic_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Delete a topic and all its messages (admin only)."""
+    try:
+        success = await TopicService.delete_topic_by_id(session, topic_id, current_user.id)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Topic not found"
+            )
+        
+        # Notify topic members via Socket.IO
+        await emit_to_room(
+            str(topic_id),
+            "topic_deleted",
+            {
+                "topic_id": str(topic_id),
+                "deleted_by": str(current_user.id)
+            }
+        )
+        
+        return None
+        
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting topic: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete topic"
+        )
+
 
 @router.get("/topics/{topic_id}", response_model=TopicDetail)
 async def get_topic(

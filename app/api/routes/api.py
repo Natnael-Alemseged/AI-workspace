@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import ai, conversations, gmail, search
+from app.api.routes import ai, conversations, gmail, search, notification_routes
 
 router = APIRouter()
 
@@ -15,6 +15,9 @@ router.include_router(ai.router)
 
 # Include Conversations routes
 router.include_router(conversations.router)
+
+# Include Notification routes
+router.include_router(notification_routes.router)
 
 # Include Agent routes
 # router.include_router(agent.router)

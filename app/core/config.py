@@ -108,6 +108,11 @@ SUPABASE_URL: str = config("SUPABASE_URL", default="")
 SUPABASE_KEY: str = config("SUPABASE_KEY", default="")
 SUPABASE_BUCKET: str = config("SUPABASE_BUCKET", default="chat-media")
 
+# Web Push Notification Configuration (VAPID)
+VAPID_PRIVATE_KEY: str = config("VAPID_PRIVATE_KEY", default="")
+VAPID_PUBLIC_KEY: str = config("VAPID_PUBLIC_KEY", default="")
+VAPID_SUBJECT: str = config("VAPID_SUBJECT", default="mailto:admin@armadaden.com")
+
 # logging configuration
 LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
 logging.basicConfig(

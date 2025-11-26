@@ -32,6 +32,8 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], Base):
     is_verified = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    is_online = Column(Boolean, default=False, nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")
@@ -41,6 +43,7 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], Base):
     gmail_drafts = relationship("GmailDraft", back_populates="user", cascade="all, delete-orphan")
     ai_actions = relationship("AIAction", back_populates="user", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
+    push_subscriptions = relationship("PushSubscription", back_populates="user", cascade="all, delete-orphan")
 
 
 class OAuthAccount(Base):
@@ -66,3 +69,19 @@ class OAuthAccount(Base):
         # Unique constraint on user_id and oauth_name
         {"schema": None},
     )
+
+
+class PushSubscription(Base):
+    """Web Push Subscription for offline notifications."""
+    
+    __tablename__ = "push_subscriptions"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    endpoint = Column(Text, nullable=False)
+    p256dh = Column(String, nullable=False)
+    auth = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="push_subscriptions")

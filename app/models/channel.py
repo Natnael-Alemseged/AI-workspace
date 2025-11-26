@@ -72,6 +72,7 @@ class TopicMember(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     last_read_at = Column(DateTime(timezone=True), nullable=True)
+    unread_count = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Relationships

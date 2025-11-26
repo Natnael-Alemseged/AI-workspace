@@ -192,3 +192,12 @@ class TopicService:
     ) -> bool:
         """Remove a reaction from a message."""
         return await TopicReactionService.remove_reaction(session, message_id, user_id, emoji)
+
+    @staticmethod
+    async def delete_topic_by_id(
+        session: AsyncSession,
+        topic_id: UUID,
+        user_id: UUID
+    ) -> bool:
+        """Delete a topic and all its associated messages (admin only)."""
+        return await TopicManagementService.delete_topic_by_id(session, topic_id, user_id)

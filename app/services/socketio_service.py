@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import logger
 from app.db import AsyncSessionLocal
-from app.models.user import User
+from app.models.user import User, PushSubscription
+from app.models.channel import TopicMember, TopicMessage, Topic
+from app.services.notification_service import notification_service
+from datetime import datetime
 
 # Load environment variables
 load_dotenv(override=True)
@@ -97,10 +100,32 @@ async def connect(sid, environ, auth):
         active_connections[sid] = str(user.id)
         user_rooms[str(user.id)] = set()
         
+        # Update user online status
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.id == user.id)
+            )
+            db_user = result.scalar_one_or_none()
+            if db_user:
+                db_user.is_online = True
+                db_user.last_seen_at = datetime.utcnow()
+                await session.commit()
+        
         logger.info(f"User {user.id} connected with sid: {sid}")
         
         # Emit connection success
         await sio.emit("connected", {"user_id": str(user.id)}, room=sid)
+        
+        # Broadcast user status change to all users
+        await sio.emit(
+            "user_status_change",
+            {
+                "user_id": str(user.id),
+                "is_online": True,
+                "last_seen_at": datetime.utcnow().isoformat()
+            },
+            skip_sid=sid
+        )
         
         return True
         
@@ -116,6 +141,27 @@ async def disconnect(sid):
     try:
         user_id = active_connections.get(sid)
         if user_id:
+            # Update user offline status
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(User).where(User.id == uuid.UUID(user_id))
+                )
+                db_user = result.scalar_one_or_none()
+                if db_user:
+                    db_user.is_online = False
+                    db_user.last_seen_at = datetime.utcnow()
+                    await session.commit()
+            
+            # Broadcast user status change to all users
+            await sio.emit(
+                "user_status_change",
+                {
+                    "user_id": user_id,
+                    "is_online": False,
+                    "last_seen_at": datetime.utcnow().isoformat()
+                }
+            )
+            
             # Leave all rooms
             if user_id in user_rooms:
                 for room_id in user_rooms[user_id]:
@@ -223,10 +269,84 @@ async def send_message(sid, data):
         
         room_id = data.get("room_id")
         message_data = data.get("message")
+        topic_id = data.get("topic_id")
         
         if not room_id or not message_data:
             await sio.emit("error", {"message": "room_id and message are required"}, room=sid)
             return
+        
+        # If this is a topic message, increment unread count for offline/inactive members
+        if topic_id:
+            async with AsyncSessionLocal() as session:
+                # Get topic info
+                topic_result = await session.execute(
+                    select(Topic).where(Topic.id == uuid.UUID(topic_id))
+                )
+                topic = topic_result.scalar_one_or_none()
+                
+                # Get sender info
+                sender_result = await session.execute(
+                    select(User).where(User.id == uuid.UUID(user_id))
+                )
+                sender = sender_result.scalar_one_or_none()
+                sender_name = sender.full_name or sender.email if sender else "Someone"
+                
+                # Get all topic members
+                result = await session.execute(
+                    select(TopicMember).where(TopicMember.topic_id == uuid.UUID(topic_id))
+                )
+                topic_members = result.scalars().all()
+                
+                offline_user_ids = []
+                
+                for member in topic_members:
+                    # Skip the sender
+                    if str(member.user_id) == user_id:
+                        continue
+                    
+                    # Check if user is online and in the topic room
+                    is_active_in_room = False
+                    if str(member.user_id) in user_rooms:
+                        if str(topic_id) in user_rooms[str(member.user_id)]:
+                            is_active_in_room = True
+                    
+                    # Increment unread count if user is not active in the room
+                    if not is_active_in_room:
+                        member.unread_count += 1
+                        offline_user_ids.append(member.user_id)
+                
+                await session.commit()
+                
+                # Send push notifications to offline users
+                if offline_user_ids and topic:
+                    for offline_user_id in offline_user_ids:
+                        # Get push subscriptions for offline user
+                        subs_result = await session.execute(
+                            select(PushSubscription).where(
+                                PushSubscription.user_id == offline_user_id
+                            )
+                        )
+                        subscriptions = subs_result.scalars().all()
+                        
+                        # Send notification to each subscription
+                        message_preview = message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
+                        
+                        for subscription in subscriptions:
+                            subscription_info = {
+                                "endpoint": subscription.endpoint,
+                                "keys": {
+                                    "p256dh": subscription.p256dh,
+                                    "auth": subscription.auth
+                                }
+                            }
+                            
+                            await notification_service.send_message_notification(
+                                subscription_info=subscription_info,
+                                sender_name=sender_name,
+                                message_preview=message_preview,
+                                topic_name=topic.name,
+                                topic_id=str(topic_id)
+                            )
         
         # Broadcast message to room
         await sio.emit(
@@ -236,6 +356,17 @@ async def send_message(sid, data):
                 "message": message_data
             },
             room=str(room_id)
+        )
+        
+        # Broadcast global alert to all users (for global notifications)
+        await sio.emit(
+            "global_message_alert",
+            {
+                "room_id": str(room_id),
+                "topic_id": str(topic_id) if topic_id else None,
+                "sender_id": user_id,
+                "message_preview": message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
+            }
         )
         
         logger.info(f"Message sent to room {room_id} by user {user_id}")
@@ -344,10 +475,26 @@ async def mark_as_read(sid, data):
             return
         
         room_id = data.get("room_id")
+        topic_id = data.get("topic_id")
         message_ids = data.get("message_ids", [])
         
         if not room_id:
             return
+        
+        # Reset unread count for topic member
+        if topic_id:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(TopicMember).where(
+                        TopicMember.topic_id == uuid.UUID(topic_id),
+                        TopicMember.user_id == uuid.UUID(user_id)
+                    )
+                )
+                topic_member = result.scalar_one_or_none()
+                if topic_member:
+                    topic_member.unread_count = 0
+                    topic_member.last_read_at = datetime.utcnow()
+                    await session.commit()
         
         # Broadcast read receipt to room
         await sio.emit(
