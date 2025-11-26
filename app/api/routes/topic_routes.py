@@ -1,13 +1,15 @@
 """Topic management API endpoints."""
-from typing import Optional
+from typing import Dict, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.users_complete import get_current_user
 from app.core.logging import logger
 from app.db import get_async_session
+from app.models.channel import TopicMember
 from app.models.user import User
 from app.schemas.channel import (
     TopicCreate,
@@ -119,6 +121,44 @@ async def get_my_topics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get topics"
         )
+
+
+@router.get("/topics/unread-counts", response_model=Dict[str, int])
+async def get_unread_counts(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get unread message counts for all topics the user is a member of.
+    
+    Returns a dictionary mapping topic_id to unread_count.
+    Example: {"topic-uuid-1": 5, "topic-uuid-2": 0, "topic-uuid-3": 12}
+    """
+    try:
+        # Get all topic memberships for the current user
+        result = await session.execute(
+            select(TopicMember).where(
+                TopicMember.user_id == current_user.id,
+                TopicMember.is_active == True
+            )
+        )
+        topic_members = result.scalars().all()
+        
+        # Build dictionary of topic_id -> unread_count
+        unread_counts = {
+            str(member.topic_id): member.unread_count
+            for member in topic_members
+        }
+        
+        return unread_counts
+        
+    except Exception as e:
+        logger.error(f"Error getting unread counts: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get unread counts"
+        )
+
 
 @router.delete("/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_topic(
@@ -358,3 +398,5 @@ async def remove_topic_member(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to remove member"
         )
+
+
