@@ -100,6 +100,11 @@ async def connect(sid, environ, auth):
         active_connections[sid] = str(user.id)
         user_rooms[str(user.id)] = set()
         
+        # Join user to their personal room for receiving global alerts
+        personal_room = f"user_{user.id}"
+        await sio.enter_room(sid, personal_room)
+        logger.info(f"User {user.id} joined personal room: {personal_room}")
+        
         # Update user online status
         async with AsyncSessionLocal() as session:
             result = await session.execute(
@@ -348,7 +353,7 @@ async def send_message(sid, data):
                                 topic_id=str(topic_id)
                             )
         
-        # Broadcast message to room
+        # Broadcast message to room (for users currently in the topic)
         await sio.emit(
             "new_message",
             {
@@ -358,16 +363,52 @@ async def send_message(sid, data):
             room=str(room_id)
         )
         
-        # Broadcast global alert to all users (for global notifications)
-        await sio.emit(
-            "global_message_alert",
-            {
-                "room_id": str(room_id),
-                "topic_id": str(topic_id) if topic_id else None,
-                "sender_id": user_id,
-                "message_preview": message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
-            }
-        )
+        # Emit new_topic_message to topic room for consistency
+        if topic_id:
+            await sio.emit(
+                "new_topic_message",
+                {
+                    "topic_id": str(topic_id),
+                    "message": message_data
+                },
+                room=str(room_id)
+            )
+        
+        # Broadcast global alert to all topic members' personal rooms
+        if topic_id:
+            async with AsyncSessionLocal() as session:
+                # Get sender info for the alert
+                sender_result = await session.execute(
+                    select(User).where(User.id == uuid.UUID(user_id))
+                )
+                sender = sender_result.scalar_one_or_none()
+                sender_name = sender.full_name or sender.email if sender else "Someone"
+                
+                # Get all topic members
+                result = await session.execute(
+                    select(TopicMember).where(TopicMember.topic_id == uuid.UUID(topic_id))
+                )
+                topic_members = result.scalars().all()
+                
+                # Emit global alert to each member's personal room
+                message_preview = message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
+                
+                for member in topic_members:
+                    # Skip the sender
+                    if str(member.user_id) == user_id:
+                        continue
+                    
+                    # Emit to user's personal room
+                    member_room = f"user_{member.user_id}"
+                    await sio.emit(
+                        "global_message_alert",
+                        {
+                            "topic_id": str(topic_id),
+                            "message_preview": message_preview,
+                            "sender_name": sender_name
+                        },
+                        room=member_room
+                    )
         
         logger.info(f"Message sent to room {room_id} by user {user_id}")
         
