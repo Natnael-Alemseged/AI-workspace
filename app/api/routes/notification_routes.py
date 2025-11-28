@@ -1,4 +1,4 @@
-"""API routes for Web Push Notification subscriptions."""
+"""API routes for FCM Push Notification subscriptions."""
 import uuid
 from typing import List
 
@@ -22,10 +22,8 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 # Pydantic models
 class PushSubscriptionCreate(BaseModel):
-    """Schema for creating a push subscription."""
-    endpoint: str
-    p256dh: str
-    auth: str
+    """Schema for creating a push subscription (FCM token)."""
+    endpoint: str  # FCM token
 
 
 class PushSubscriptionResponse(BaseModel):
@@ -38,31 +36,6 @@ class PushSubscriptionResponse(BaseModel):
         from_attributes = True
 
 
-class VAPIDPublicKeyResponse(BaseModel):
-    """Schema for VAPID public key response."""
-    public_key: str
-
-
-@router.get("/vapid-public-key", response_model=VAPIDPublicKeyResponse)
-async def get_vapid_public_key():
-    """
-    Get the VAPID public key for Web Push subscriptions.
-    
-    This key is needed by the frontend to subscribe to push notifications.
-    """
-    from app.core.config import config
-    
-    public_key = config("VAPID_PUBLIC_KEY", default="")
-    
-    if not public_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Push notifications are not configured on the server"
-        )
-    
-    return {"public_key": public_key}
-
-
 @router.post("/subscribe", response_model=PushSubscriptionResponse, status_code=status.HTTP_201_CREATED)
 async def subscribe_to_push(
     subscription: PushSubscriptionCreate,
@@ -70,10 +43,10 @@ async def subscribe_to_push(
     session: AsyncSession = Depends(get_async_session)
 ):
     """
-    Subscribe to push notifications.
+    Subscribe to FCM push notifications.
     
-    Creates a new push subscription for the current user.
-    If a subscription with the same endpoint already exists, it will be updated.
+    Creates a new FCM push subscription for the current user.
+    If a subscription with the same endpoint (FCM token) already exists, it will be updated.
     """
     # Check if subscription already exists
     result = await session.execute(
@@ -85,9 +58,7 @@ async def subscribe_to_push(
     existing_subscription = result.scalar_one_or_none()
     
     if existing_subscription:
-        # Update existing subscription
-        existing_subscription.p256dh = subscription.p256dh
-        existing_subscription.auth = subscription.auth
+        # Subscription already exists, just return it
         await session.commit()
         await session.refresh(existing_subscription)
         
@@ -100,9 +71,7 @@ async def subscribe_to_push(
     # Create new subscription
     new_subscription = PushSubscription(
         user_id=current_user.id,
-        endpoint=subscription.endpoint,
-        p256dh=subscription.p256dh,
-        auth=subscription.auth
+        endpoint=subscription.endpoint
     )
     
     session.add(new_subscription)
@@ -123,7 +92,7 @@ async def unsubscribe_from_push(
     session: AsyncSession = Depends(get_async_session)
 ):
     """
-    Unsubscribe from push notifications.
+    Unsubscribe from FCM push notifications.
     
     Deletes a push subscription by ID. Users can only delete their own subscriptions.
     """
@@ -163,9 +132,9 @@ async def unsubscribe_by_endpoint(
     session: AsyncSession = Depends(get_async_session)
 ):
     """
-    Unsubscribe from push notifications by endpoint.
+    Unsubscribe from FCM push notifications by endpoint.
     
-    Deletes a push subscription by endpoint URL. Useful when subscription ID is not available.
+    Deletes a push subscription by FCM token (endpoint). Useful when subscription ID is not available.
     """
     # Get subscription
     result = await session.execute(
@@ -194,9 +163,9 @@ async def get_user_subscriptions(
     session: AsyncSession = Depends(get_async_session)
 ):
     """
-    Get all push subscriptions for the current user.
+    Get all FCM push subscriptions for the current user.
     
-    Returns a list of all active push subscriptions.
+    Returns a list of all active FCM push subscriptions.
     """
     result = await session.execute(
         select(PushSubscription).where(

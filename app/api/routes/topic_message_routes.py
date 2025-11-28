@@ -1,7 +1,7 @@
 """Topic message API endpoints."""
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,8 +16,10 @@ from app.schemas.channel import (
     TopicMessageRead,
     TopicMessageUpdate,
 )
+from app.schemas.chat import MediaUploadResponse
 from app.core.ai_bots import get_bot_avatar, get_bot_id_for_agent_type, get_bot_name
 from app.services.chat import agent_service
+from app.services.integrations import SupabaseService
 from app.services.socketio_service import emit_to_room
 from app.services.topic import TopicService
 from app.utils.ai_agent_parser import parse_agent_mention
@@ -53,6 +55,18 @@ async def create_topic_message(
                     "reply_to_id": str(message.reply_to_id) if message.reply_to_id else None,
                     "is_edited": False,
                     "is_deleted": False,
+                    # Attachments
+                    "attachments": [
+                        {
+                            "id": str(att.id),
+                            "url": att.url,
+                            "filename": att.filename,
+                            "size": att.size,
+                            "mime_type": att.mime_type,
+                            "created_at": att.created_at.isoformat()
+                        }
+                        for att in message.attachments
+                    ] if hasattr(message, 'attachments') and message.attachments else [],
                     # Include sender info to match REST API response
                     "sender_email": message.sender.email if message.sender else None,
                     "sender_full_name": message.sender.full_name if message.sender else None,
@@ -352,3 +366,66 @@ async def process_ai_topic_response(
             )
         except Exception as emit_error:
             logger.error(f"Error emitting AI error: {emit_error}")
+
+
+# ============================================================================
+# Media Upload Endpoints
+# ============================================================================
+
+@router.post("/topics/{topic_id}/upload", response_model=MediaUploadResponse)
+async def upload_topic_media(
+    topic_id: UUID,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Upload media file for topic message to Supabase storage."""
+    try:
+        # Verify user is a member of the topic
+        from app.models.channel import TopicMember
+        from sqlalchemy import and_
+        
+        member_query = select(TopicMember).where(
+            and_(
+                TopicMember.topic_id == topic_id,
+                TopicMember.user_id == current_user.id,
+                TopicMember.is_active == True
+            )
+        )
+        member_result = await session.execute(member_query)
+        member = member_result.scalar_one_or_none()
+        
+        if not member:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not a member of this topic"
+            )
+        
+        # Read file content
+        content = await file.read()
+        
+        # Upload to Supabase
+        result = await SupabaseService.upload_file(
+            file_content=content,
+            filename=file.filename,
+            content_type=file.content_type,
+            folder=f"topics/{topic_id}/{current_user.id}"
+        )
+        
+        logger.info(f"Media uploaded for topic {topic_id}: {result['filename']}")
+        
+        return MediaUploadResponse(
+            url=result["url"],
+            filename=result["filename"],
+            size=result["size"],
+            mime_type=result["content_type"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading media: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload media"
+        )

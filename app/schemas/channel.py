@@ -154,11 +154,20 @@ class TopicListResponse(BaseModel):
 # Topic Message Schemas
 # ============================================================================
 
+class AttachmentData(BaseModel):
+    """Schema for file attachment data."""
+    url: str
+    filename: str
+    size: int
+    mime_type: str
+
+
 class TopicMessageCreate(BaseModel):
     """Schema for creating a new message in a topic."""
     content: str = Field(..., min_length=1)
     reply_to_id: Optional[UUID] = None
     mentioned_user_ids: list[UUID] = Field(default_factory=list, description="Users to mention")
+    attachments: list[AttachmentData] = Field(default_factory=list, description="File attachments")
 
 
 class TopicMessageUpdate(BaseModel):
@@ -204,6 +213,19 @@ class ReactionSummary(BaseModel):
     user_reacted: bool = False  # Whether current user reacted
 
 
+class AttachmentRead(BaseModel):
+    """Schema for reading attachment info."""
+    id: UUID
+    url: str
+    filename: str
+    size: int
+    mime_type: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
 class TopicMessageRead(BaseModel):
     """Schema for reading topic message."""
     id: UUID
@@ -216,6 +238,9 @@ class TopicMessageRead(BaseModel):
     is_deleted: bool
     deleted_at: Optional[datetime] = None
     created_at: datetime
+    
+    # Attachments
+    attachments: list[AttachmentRead] = Field(default_factory=list)
     
     # Sender info - populated from relationship
     sender_email: Optional[str] = None

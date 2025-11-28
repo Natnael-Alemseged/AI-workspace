@@ -107,6 +107,24 @@ class TopicMessage(Base):
     reply_to = relationship("TopicMessage", remote_side=[id], foreign_keys=[reply_to_id])
     mentions = relationship("MessageMention", back_populates="message", cascade="all, delete-orphan")
     reactions = relationship("MessageReaction", back_populates="message", cascade="all, delete-orphan")
+    attachments = relationship("TopicMessageAttachment", back_populates="message", cascade="all, delete-orphan")
+
+
+class TopicMessageAttachment(Base):
+    """File attachments for topic messages."""
+    
+    __tablename__ = "topic_message_attachments"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    message_id = Column(UUID(as_uuid=True), ForeignKey("topic_messages.id"), nullable=False, index=True)
+    url = Column(String, nullable=False)  # Supabase storage URL
+    filename = Column(String, nullable=False)  # Original filename
+    size = Column(Integer, nullable=False)  # File size in bytes
+    mime_type = Column(String, nullable=False)  # MIME type
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    message = relationship("TopicMessage", back_populates="attachments")
 
 
 class MessageMention(Base):

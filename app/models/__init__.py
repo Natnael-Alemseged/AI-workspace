@@ -9,6 +9,7 @@ from app.models.channel import (
     Topic,
     TopicMember,
     TopicMessage,
+    TopicMessageAttachment,
 )
 from app.models.chat import (
     ChatMessage,
@@ -65,6 +66,7 @@ __all__ = [
     "Topic",
     "TopicMember",
     "TopicMessage",
+    "TopicMessageAttachment",
     "MessageMention",
     "MessageReaction",
 ]

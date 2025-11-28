@@ -337,16 +337,9 @@ async def send_message(sid, data):
                         message_preview = message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
                         
                         for subscription in subscriptions:
-                            subscription_info = {
-                                "endpoint": subscription.endpoint,
-                                "keys": {
-                                    "p256dh": subscription.p256dh,
-                                    "auth": subscription.auth
-                                }
-                            }
-                            
+                            # Pass FCM token directly
                             await notification_service.send_message_notification(
-                                subscription_info=subscription_info,
+                                subscription_info=subscription.endpoint,
                                 sender_name=sender_name,
                                 message_preview=message_preview,
                                 topic_name=topic.name,

@@ -10,12 +10,13 @@ from sqlalchemy.orm import selectinload
 
 from app.core.ai_bots import get_bot_id_for_agent_type
 from app.core.logging import logger
-from app.models.channel import MessageMention, Topic, TopicMember, TopicMessage
-from app.models.user import User, UserRole
+from app.models.channel import MessageMention, Topic, TopicMember, TopicMessage, TopicMessageAttachment
+from app.models.user import PushSubscription, User, UserRole
 from app.schemas.channel import TopicMessageCreate
 from app.utils.ai_agent_parser import parse_agent_mention
 from app.services.chat import agent_service
-
+from app.services.notification_service import notification_service
+import asyncio
 
 class TopicMessageService:
     """Service for topic message operations."""
@@ -79,6 +80,19 @@ class TopicMessageService:
             session.add(message)
             await session.flush()
             
+            # Create attachment records if any
+            if message_data.attachments:
+                for attachment_data in message_data.attachments:
+                    attachment = TopicMessageAttachment(
+                        message_id=message.id,
+                        url=attachment_data.url,
+                        filename=attachment_data.filename,
+                        size=attachment_data.size,
+                        mime_type=attachment_data.mime_type
+                    )
+                    session.add(attachment)
+                await session.flush()
+            
             # Process mentions
             mentioned_user_ids = set(message_data.mentioned_user_ids)
             
@@ -135,6 +149,43 @@ class TopicMessageService:
                 logger.info(f"AI agent detected: {agent_mention.agent_type}, will process asynchronously")
                 # Return message immediately, AI will process in background
                 # The background task will be triggered by the route handler
+
+            logger.info(f"Message created: {message.id} in topic {topic_id}")
+
+            # 🔥 Send push notification to other members
+            member_query = select(TopicMember.user_id).where(
+                and_(
+                    TopicMember.topic_id == topic_id,
+                    TopicMember.is_active == True,
+                    TopicMember.user_id != sender_id
+                )
+            )
+            result = await session.execute(member_query)
+            receiver_ids = result.scalars().all()
+
+            # Fetch all push subscriptions for topic members (users can have multiple devices)
+            if receiver_ids:
+                subscription_query = select(PushSubscription).where(
+                    PushSubscription.user_id.in_(receiver_ids)
+                )
+                sub_result = await session.execute(subscription_query)
+                subscriptions = sub_result.scalars().all()
+
+                notification_count = 0
+                for subscription in subscriptions:
+                    # Pass FCM token directly
+                    asyncio.create_task(
+                        notification_service.send_message_notification(
+                            subscription_info=subscription.endpoint,
+                            sender_name=message.sender.full_name,
+                            message_preview=message_content,
+                            topic_name=topic.name,
+                            topic_id=str(topic_id),
+                        )
+                    )
+                    notification_count += 1
+
+                logger.info(f"📨 Push notifications queued for {notification_count} subscriptions across {len(receiver_ids)} users")
             
             return message
             

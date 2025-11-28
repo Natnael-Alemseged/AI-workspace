@@ -1,23 +1,12 @@
-"""Web Push Notification Service for offline notifications."""
-import json
-import os
+"""FCM Push Notification Service for offline notifications."""
 from typing import Optional
-from pywebpush import webpush, WebPushException
 
 from app.core.logging import logger
-from app.core.config import config
+from app.services.fcm_service import fcm_service
 
 
 class NotificationService:
-    """Service for sending Web Push notifications."""
-    
-    def __init__(self):
-        """Initialize the notification service with VAPID keys."""
-        self.vapid_private_key = config("VAPID_PRIVATE_KEY", default="")
-        self.vapid_public_key = config("VAPID_PUBLIC_KEY", default="")
-        self.vapid_claims = {
-            "sub": config("VAPID_SUBJECT", default="mailto:admin@armadaden.com")
-        }
+    """Service for sending notifications via FCM."""
     
     async def send_notification(
         self,
@@ -30,56 +19,40 @@ class NotificationService:
         tag: Optional[str] = None
     ) -> bool:
         """
-        Send a Web Push notification to a subscriber.
+        Send a notification to a subscriber via FCM.
         
         Args:
-            subscription_info: Push subscription object with endpoint, keys
+            subscription_info: FCM token (string or dict with 'token' or 'endpoint')
             title: Notification title
             body: Notification body text
             data: Optional additional data to send
             icon: Optional icon URL
-            badge: Optional badge URL
-            tag: Optional tag for notification grouping
+            badge: Optional badge URL (unused in FCM)
+            tag: Optional tag for notification grouping (unused in FCM)
             
         Returns:
             True if notification sent successfully, False otherwise
         """
-        if not self.vapid_private_key or not self.vapid_public_key:
-            logger.warning("VAPID keys not configured. Skipping push notification.")
+        # Extract FCM token from various formats
+        fcm_token = None
+        if isinstance(subscription_info, str):
+            fcm_token = subscription_info
+        elif isinstance(subscription_info, dict):
+            # Try different keys where token might be stored
+            fcm_token = subscription_info.get("token") or subscription_info.get("endpoint")
+        
+        if not fcm_token:
+            logger.warning("No FCM token found in subscription_info")
             return False
         
-        try:
-            # Build notification payload
-            payload = {
-                "title": title,
-                "body": body,
-                "icon": icon or "/default-icon.png",
-                "badge": badge or "/badge-icon.png",
-                "tag": tag or "default",
-                "data": data or {}
-            }
-            
-            # Send push notification
-            webpush(
-                subscription_info=subscription_info,
-                data=json.dumps(payload),
-                vapid_private_key=self.vapid_private_key,
-                vapid_claims=self.vapid_claims
-            )
-            
-            logger.info(f"Push notification sent successfully: {title}")
-            return True
-            
-        except WebPushException as e:
-            logger.error(f"Web Push error: {e}")
-            # If subscription is invalid (410 Gone), it should be removed
-            if e.response and e.response.status_code == 410:
-                logger.info("Subscription expired, should be removed from database")
-            return False
-            
-        except Exception as e:
-            logger.error(f"Error sending push notification: {e}")
-            return False
+        # Send via FCM
+        return fcm_service.send_notification(
+            token=fcm_token,
+            title=title,
+            body=body,
+            data=data,
+            image=icon
+        )
     
     async def send_message_notification(
         self,
@@ -91,16 +64,6 @@ class NotificationService:
     ) -> bool:
         """
         Send a notification for a new message.
-        
-        Args:
-            subscription_info: Push subscription object
-            sender_name: Name of the message sender
-            message_preview: Preview of the message content
-            topic_name: Name of the topic
-            topic_id: ID of the topic
-            
-        Returns:
-            True if notification sent successfully
         """
         return await self.send_notification(
             subscription_info=subscription_info,
@@ -124,16 +87,6 @@ class NotificationService:
     ) -> bool:
         """
         Send a notification for a mention.
-        
-        Args:
-            subscription_info: Push subscription object
-            sender_name: Name of the user who mentioned
-            message_preview: Preview of the message content
-            topic_name: Name of the topic
-            topic_id: ID of the topic
-            
-        Returns:
-            True if notification sent successfully
         """
         return await self.send_notification(
             subscription_info=subscription_info,
