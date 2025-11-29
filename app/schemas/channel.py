@@ -256,10 +256,27 @@ class TopicMessageRead(BaseModel):
     # Reactions
     reactions: list[ReactionSummary] = Field(default_factory=list)
 
-    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    @model_validator(mode='before')
+    @classmethod
+    def populate_sender_info(cls, data):
+        """Populate sender info from the sender relationship."""
+        if hasattr(data, 'sender') and data.sender:
+            if isinstance(data, dict):
+                return data
+            # Build dict with all fields
+            result = {k: getattr(data, k) for k in ['id', 'topic_id', 'sender_id', 'content', 'reply_to_id', 
+                                                      'is_edited', 'edited_at', 'is_deleted', 'deleted_at', 'created_at']}
+            result['attachments'] = data.attachments if hasattr(data, 'attachments') else []
+            result['sender_email'] = getattr(data.sender, 'email', None)
+            result['sender_full_name'] = getattr(data.sender, 'full_name', None)
+            result['mention_count'] = len(data.mentions) if hasattr(data, 'mentions') and data.mentions else 0
+            result['reaction_count'] = len(data.reactions) if hasattr(data, 'reactions') and data.reactions else 0
+            result['reactions'] = []
+            return result
+        return data
+
     class Config:
         from_attributes = True
-    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 
 class TopicMessageDetail(TopicMessageRead):
     """Detailed message info including mentions (reactions inherited from TopicMessageRead)."""
