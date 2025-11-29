@@ -8,6 +8,7 @@ class AgentType(str, Enum):
     """Supported AI agent types."""
     EMAIL_AI = "emailAi"
     SEARCH_AI = "searchAi"
+    GENERAL_AI = "general"
 
 
 class AgentMention:
@@ -29,6 +30,8 @@ def parse_agent_mention(message: str) -> Optional[AgentMention]:
     Supports patterns like:
     - "@emailAi send an email to user@example.com"
     - "@searchAi find information about Python"
+    - "@Email AI send an email to user@example.com" (with spaces)
+    - "@Search AI find information about Python" (with spaces)
     
     Args:
         message: The message content to parse
@@ -36,20 +39,22 @@ def parse_agent_mention(message: str) -> Optional[AgentMention]:
     Returns:
         AgentMention object if an agent mention is detected, None otherwise
     """
-    # Pattern to match @agentName followed by text
-    pattern = r'@(emailAi|searchAi)\s+(.+)'
+    # Pattern to match @agentName followed by text (supports spaces in agent name)
+    # Matches: @emailAi, @Email AI, @searchAi, @Search AI, etc.
+    pattern = r'@([\w\s]+?)\s+(.+)'
     match = re.match(pattern, message.strip(), re.IGNORECASE)
     
     if not match:
         return None
     
-    agent_name = match.group(1).lower()
+    agent_name = match.group(1).strip().lower().replace(' ', '')
     prompt = match.group(2).strip()
     
-    # Map agent name to AgentType
+    # Map agent name to AgentType (normalize by removing spaces and lowercasing)
     agent_type_map = {
         'emailai': AgentType.EMAIL_AI,
         'searchai': AgentType.SEARCH_AI,
+        'generalai': AgentType.GENERAL_AI,
     }
     
     agent_type = agent_type_map.get(agent_name)

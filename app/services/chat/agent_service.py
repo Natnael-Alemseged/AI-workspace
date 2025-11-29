@@ -72,10 +72,10 @@ async def get_tools(user_id: str, agent_type: str = None):
                 toolkits=["composio_search"],
                 limit=50
             )
-            search_tools = [
-                t for t in search_tools
-                if t.metadata.name in ["COMPOSIO_SEARCH_WEB"]
-            ]
+            # search_tools = [
+            #     t for t in search_tools
+            #     if t.metadata.name in ["COMPOSIO_SEARCH_WEB"]
+            # ]
             print(f"✅ Search tools initialized: {len(search_tools)} tools")
         return search_tools
     

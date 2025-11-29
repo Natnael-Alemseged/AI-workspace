@@ -390,11 +390,18 @@ class TopicManagementService:
             # Import TopicMessage model
             from app.models.channel import TopicMessage
             
-            # Delete all messages in the topic (cascade will handle mentions and reactions)
+            # First, get all messages in the topic
             delete_messages_query = select(TopicMessage).where(TopicMessage.topic_id == topic_id)
             messages_result = await session.execute(delete_messages_query)
             messages = messages_result.scalars().all()
             
+            # Step 1: Set all reply_to_id to NULL to avoid foreign key constraint violations
+            for message in messages:
+                message.reply_to_id = None
+            
+            await session.flush()
+            
+            # Step 2: Now delete all messages (cascade will handle mentions and reactions)
             for message in messages:
                 await session.delete(message)
             

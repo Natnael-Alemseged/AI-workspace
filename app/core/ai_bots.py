@@ -27,6 +27,20 @@ BOT_AVATARS = {
     GENERAL_AI_BOT_ID: "🤖",
 }
 
+# Map bot names to agent types (for reverse lookup)
+BOT_NAME_TO_AGENT_TYPE = {
+    "Email AI": "emailAi",
+    "Search AI": "searchAi",
+    "General AI": "general",
+}
+
+# Map bot emails to agent types
+BOT_EMAIL_TO_AGENT_TYPE = {
+    "emailai@armada.bot": "emailAi",
+    "searchai@armada.bot": "searchAi",
+    "generalai@armada.bot": "general",
+}
+
 
 def get_bot_id_for_agent_type(agent_type: str) -> UUID:
     """Get the bot user ID for a given agent type."""
@@ -41,3 +55,13 @@ def get_bot_name(bot_id: UUID) -> str:
 def get_bot_avatar(bot_id: UUID) -> str:
     """Get the avatar emoji for a bot."""
     return BOT_AVATARS.get(bot_id, "🤖")
+
+
+def get_agent_type_from_bot_name(bot_name: str) -> str:
+    """Get the agent type for a bot display name."""
+    return BOT_NAME_TO_AGENT_TYPE.get(bot_name)
+
+
+def get_agent_type_from_bot_email(bot_email: str) -> str:
+    """Get the agent type for a bot email."""
+    return BOT_EMAIL_TO_AGENT_TYPE.get(bot_email)
