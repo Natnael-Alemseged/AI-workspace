@@ -46,7 +46,7 @@ class NotificationService:
             return False
         
         # Send via FCM
-        return fcm_service.send_notification(
+        return await fcm_service.send_notification(
             token=fcm_token,
             title=title,
             body=body,

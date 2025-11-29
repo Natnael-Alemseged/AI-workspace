@@ -3,6 +3,7 @@ Firebase Cloud Messaging (FCM) Service.
 Handles initialization and sending of push notifications via FCM.
 """
 import os
+import asyncio
 import firebase_admin
 from firebase_admin import credentials, messaging
 from app.core.logging import logger
@@ -56,7 +57,7 @@ class FCMService:
         except Exception as e:
             logger.error(f"Error initializing Firebase Admin SDK: {e}")
 
-    def send_notification(
+    async def send_notification(
         self,
         token: str,
         title: str,
@@ -102,8 +103,9 @@ class FCMService:
                 token=token
             )
             
-            # Send message
-            response = messaging.send(message)
+            # Send message in a thread to avoid blocking the event loop
+            # Firebase Admin SDK is synchronous, so we need to run it in a thread
+            response = await asyncio.to_thread(messaging.send, message)
             logger.info(f"FCM notification sent: {response}")
             return True
             
@@ -115,7 +117,7 @@ class FCMService:
             logger.error(f"Error sending FCM notification: {e}")
             return False
 
-    def send_multicast(
+    async def send_multicast(
         self,
         tokens: list[str],
         title: str,
@@ -156,7 +158,8 @@ class FCMService:
                 tokens=tokens
             )
             
-            batch_response = messaging.send_multicast(message)
+            # Send multicast in a thread to avoid blocking the event loop
+            batch_response = await asyncio.to_thread(messaging.send_multicast, message)
             
             if batch_response.failure_count > 0:
                 logger.warning(f"FCM multicast failed for {batch_response.failure_count} tokens")

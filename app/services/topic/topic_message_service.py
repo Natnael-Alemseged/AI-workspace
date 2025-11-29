@@ -12,7 +12,7 @@ from app.core.ai_bots import get_bot_id_for_agent_type
 from app.core.logging import logger
 from app.models.channel import MessageMention, Topic, TopicMember, TopicMessage, TopicMessageAttachment
 from app.models.user import PushSubscription, User, UserRole
-from app.schemas.channel import TopicMessageCreate
+from app.schemas.channel import TopicMessageCreate, TopicMessageRead
 from app.utils.ai_agent_parser import parse_agent_mention
 from app.services.chat import agent_service
 from app.services.notification_service import notification_service
@@ -61,6 +61,8 @@ class TopicMessageService:
             )
             member_result = await session.execute(member_query)
             member = member_result.scalar_one_or_none()
+
+
             
             if not member:
                 raise ValueError("User is not a member of this topic")
@@ -133,15 +135,47 @@ class TopicMessageService:
             topic_query = select(Topic).where(Topic.id == topic_id)
             topic_result = await session.execute(topic_query)
             topic = topic_result.scalar_one_or_none()
+            
+            topic_name = "Unknown Topic"
             if topic:
                 topic.updated_at = datetime.utcnow()
+                topic_name = topic.name
 
             await session.commit()
             
             # Load relationships to prevent lazy loading errors
-            await session.refresh(message, ["sender", "mentions", "reactions"])
+            # Use a select statement with options to ensure relationships are loaded
+            # session.refresh doesn't always handle relationships correctly in async
+            message_query = (
+                select(TopicMessage)
+                .where(TopicMessage.id == message.id)
+                .options(
+                    selectinload(TopicMessage.sender),
+                    selectinload(TopicMessage.mentions),
+                    selectinload(TopicMessage.reactions),
+                    selectinload(TopicMessage.attachments)
+                )
+            )
+            message_result = await session.execute(message_query)
+            message = message_result.scalar_one()
             
             logger.info(f"Message created: {message.id} in topic {topic_id}")
+
+            # ADD YOUR PRINT HERE — PERFECT SPOT
+            print("\nMessage Attachments:")
+            if message.attachments:
+                for attachment in message.attachments:
+                    print({
+                        "id": attachment.id,
+                        "filename": attachment.filename,
+                        "url": attachment.url,
+                        "size": attachment.size,
+                        "mime_type": attachment.mime_type
+                    })
+            else:
+                print("  No attachments")
+            print(f"Total attachments: {len(message.attachments)}")
+            # END OF PRINT
             
             # Check if message contains AI agent mention (process async)
             agent_mention = parse_agent_mention(message_data.content)
@@ -171,21 +205,23 @@ class TopicMessageService:
                 sub_result = await session.execute(subscription_query)
                 subscriptions = sub_result.scalars().all()
 
-                notification_count = 0
+                # Send push notifications (await to ensure session remains valid)
+                notification_tasks = []
                 for subscription in subscriptions:
                     # Pass FCM token directly
-                    asyncio.create_task(
-                        notification_service.send_message_notification(
-                            subscription_info=subscription.endpoint,
-                            sender_name=message.sender.full_name,
-                            message_preview=message_content,
-                            topic_name=topic.name,
-                            topic_id=str(topic_id),
-                        )
+                    task = notification_service.send_message_notification(
+                        subscription_info=subscription.endpoint,
+                        sender_name=message.sender.full_name,
+                        message_preview=message_content,
+                        topic_name=topic_name,
+                        topic_id=str(topic_id),
                     )
-                    notification_count += 1
+                    notification_tasks.append(task)
 
-                logger.info(f"📨 Push notifications queued for {notification_count} subscriptions across {len(receiver_ids)} users")
+                # Execute all notifications concurrently
+                if notification_tasks:
+                    await asyncio.gather(*notification_tasks, return_exceptions=True)
+                    logger.info(f"📨 Push notifications sent for {len(notification_tasks)} subscriptions across {len(receiver_ids)} users")
             
             return message
             
@@ -289,14 +325,21 @@ class TopicMessageService:
                 .options(
                     selectinload(TopicMessage.sender),
                     selectinload(TopicMessage.mentions),
-                    selectinload(TopicMessage.reactions)
+                    selectinload(TopicMessage.reactions),
+                    selectinload(TopicMessage.attachments)
                 )
             )
             
             result = await session.execute(query)
             messages = result.scalars().all()
-            
-            return list(messages), total
+
+            # THIS IS THE KEY FIX:
+            pydantic_messages = [
+                TopicMessageRead.model_validate(msg)  # ← Convert each ORM object
+                for msg in messages
+            ]
+
+            return pydantic_messages, total
             
         except ValueError:
             raise
@@ -331,7 +374,20 @@ class TopicMessageService:
             message.edited_at = datetime.utcnow()
             
             await session.commit()
-            await session.refresh(message, ["sender", "mentions", "reactions"])
+            
+            # Load relationships to prevent lazy loading errors
+            message_query = (
+                select(TopicMessage)
+                .where(TopicMessage.id == message.id)
+                .options(
+                    selectinload(TopicMessage.sender),
+                    selectinload(TopicMessage.mentions),
+                    selectinload(TopicMessage.reactions),
+                    selectinload(TopicMessage.attachments)
+                )
+            )
+            message_result = await session.execute(message_query)
+            message = message_result.scalar_one()
             
             logger.info(f"Message updated: {message_id}")
             return message

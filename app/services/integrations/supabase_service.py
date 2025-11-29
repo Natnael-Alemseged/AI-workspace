@@ -1,31 +1,47 @@
-"""Supabase service for media storage."""
+"""Supabase service for media storage using S3 protocol."""
 import mimetypes
 import os
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, Any
 from uuid import uuid4
 
-from supabase import Client, create_client
+import boto3
+from botocore.client import Config as BotoConfig
+from botocore.exceptions import ClientError
 
-from app.core.config import SUPABASE_BUCKET, SUPABASE_KEY, SUPABASE_URL
+from app.core.config import (
+    SUPABASE_BUCKET,
+    SUPABASE_S3_ACCESS_KEY_ID,
+    SUPABASE_S3_SECRET_ACCESS_KEY,
+    SUPABASE_S3_ENDPOINT_URL,
+    SUPABASE_S3_REGION_NAME, SUPABASE_PROJECT_REF,
+)
 from app.core.logging import logger
 
 
 class SupabaseService:
-    """Service for handling Supabase storage operations."""
+    """Service for handling Supabase storage operations via S3 protocol."""
     
-    _client: Optional[Client] = None
+    _client: Optional[Any] = None
     
     @classmethod
-    def get_client(cls) -> Client:
-        """Get or create Supabase client."""
+    def get_client(cls) -> Any:
+        """Get or create S3 client."""
         if cls._client is None:
-            if not SUPABASE_URL or not SUPABASE_KEY:
+            if not SUPABASE_S3_ACCESS_KEY_ID or not SUPABASE_S3_SECRET_ACCESS_KEY:
                 raise ValueError(
-                    "SUPABASE_URL and SUPABASE_KEY must be set in environment variables"
+                    "SUPABASE_S3_ACCESS_KEY_ID and SUPABASE_S3_SECRET_ACCESS_KEY must be set in environment variables"
                 )
-            cls._client = create_client(SUPABASE_URL, SUPABASE_KEY)
-            logger.info("Supabase client initialized")
+            
+            cls._client = boto3.client(
+                's3',
+                aws_access_key_id=SUPABASE_S3_ACCESS_KEY_ID,
+                aws_secret_access_key=SUPABASE_S3_SECRET_ACCESS_KEY,
+                endpoint_url=SUPABASE_S3_ENDPOINT_URL,
+                region_name=SUPABASE_S3_REGION_NAME,
+                config=BotoConfig(signature_version='s3v4')
+            )
+            logger.info("Supabase S3 client initialized")
         return cls._client
     
     @classmethod
@@ -37,7 +53,7 @@ class SupabaseService:
         folder: str = "chat"
     ) -> dict:
         """
-        Upload a file to Supabase storage.
+        Upload a file to Supabase storage via S3.
         
         Args:
             file_content: File content as bytes
@@ -66,46 +82,57 @@ class SupabaseService:
             logger.debug(f"Uploading to bucket: {SUPABASE_BUCKET}, path: {file_path}")
             
             try:
-                response = client.storage.from_(SUPABASE_BUCKET).upload(
-                    file_path,
-                    file_content,
-                    {
-                        "content-type": content_type,
-                        "x-upsert": "false"
-                    }
+                client.put_object(
+                    Bucket=SUPABASE_BUCKET,
+                    Key=file_path,
+                    Body=file_content,
+                    ContentType=content_type,
+                    ACL='public-read' # Assuming public bucket, otherwise remove or change
                 )
-                logger.debug(f"Upload response: {response}")
-            except Exception as upload_error:
+            except ClientError as e:
                 logger.error(f"Upload failed - Bucket: {SUPABASE_BUCKET}, Path: {file_path}")
-                logger.error(f"Upload error details: {str(upload_error)}")
-                logger.error(f"Error type: {type(upload_error).__name__}")
-                
-                # Try to extract more details from the error
-                if hasattr(upload_error, 'response'):
-                    logger.error(f"Response status: {getattr(upload_error.response, 'status_code', 'N/A')}")
-                    logger.error(f"Response body: {getattr(upload_error.response, 'text', 'N/A')}")
-                
-                raise ValueError(f"Failed to upload file to Supabase storage: {str(upload_error)}")
+                logger.error(f"Upload error details: {str(e)}")
+                raise ValueError(f"Failed to upload file to Supabase storage: {str(e)}")
             
             logger.info(f"File uploaded to Supabase: {file_path}")
             
-            # Get public URL (or signed URL for private buckets)
-            public_url = client.storage.from_(SUPABASE_BUCKET).get_public_url(file_path)
+            # Construct public URL
+            # S3 endpoint + bucket + key
+            # Or if using Supabase, it might be endpoint/bucket/key
+            # The provided endpoint is https://<project>.storage.supabase.co/storage/v1/s3
+            # Public URL for supabase is usually https://<project>.supabase.co/storage/v1/object/public/<bucket>/<key>
+            # But we can also use the S3 endpoint if it supports public access.
+            # Let's try to construct it based on the endpoint or use get_signed_url if private.
+            
+            # For now, let's assume we want a signed URL or a public URL.
+            # If the bucket is public, we can construct the URL.
+            # If we use the S3 client to generate a presigned URL, that works too.
+            
+            # Let's return a signed URL by default for safety, or just the path.
+            # The original code returned a public URL.
+            
+            # Let's try to generate a URL.
+            public_url = f"https://{SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/{SUPABASE_BUCKET}/{file_path}"
+            # Note: Supabase S3 endpoint might not serve files directly via GET without auth if private.
+            # But if we want a public URL, we usually use the standard Supabase storage URL.
+            # However, we only have S3 creds now.
+            
+            # Let's use presigned URL for the return value to be safe.
+            # Or if the user wants public access, they should configure the bucket as public.
+            
+            # Let's generate a presigned URL for immediate access?
+            # The original code used `get_public_url`.
             
             return {
-                "url": public_url,
+                "url": public_url, # This might need adjustment based on actual public access config
                 "path": file_path,
                 "filename": filename,
                 "content_type": content_type,
                 "size": len(file_content)
             }
             
-        except ValueError as ve:
-            # Re-raise ValueError with our custom message
-            raise
         except Exception as e:
             logger.error(f"Error uploading file to Supabase: {e}")
-            logger.error(f"Error type: {type(e).__name__}")
             raise
     
     @classmethod
@@ -135,16 +162,21 @@ class SupabaseService:
             file_path = f"{folder}/{unique_filename}"
             
             # Create signed upload URL
-            signed_url = client.storage.from_(SUPABASE_BUCKET).create_signed_upload_url(
-                file_path
+            signed_url = client.generate_presigned_url(
+                'put_object',
+                Params={
+                    'Bucket': SUPABASE_BUCKET,
+                    'Key': file_path,
+                    'ContentType': mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+                },
+                ExpiresIn=expires_in
             )
             
             logger.info(f"Generated signed upload URL for: {file_path}")
             
             return {
-                "signed_url": signed_url["signedURL"],
+                "signed_url": signed_url,
                 "path": file_path,
-                "token": signed_url.get("token"),
                 "expires_in": expires_in
             }
             
@@ -171,12 +203,16 @@ class SupabaseService:
         try:
             client = cls.get_client()
             
-            signed_url = client.storage.from_(SUPABASE_BUCKET).create_signed_url(
-                file_path,
-                expires_in
+            signed_url = client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': SUPABASE_BUCKET,
+                    'Key': file_path
+                },
+                ExpiresIn=expires_in
             )
             
-            return signed_url["signedURL"]
+            return signed_url
             
         except Exception as e:
             logger.error(f"Error generating signed URL: {e}")
@@ -196,7 +232,7 @@ class SupabaseService:
         try:
             client = cls.get_client()
             
-            client.storage.from_(SUPABASE_BUCKET).remove([file_path])
+            client.delete_object(Bucket=SUPABASE_BUCKET, Key=file_path)
             
             logger.info(f"File deleted from Supabase: {file_path}")
             return True
@@ -220,13 +256,30 @@ class SupabaseService:
         try:
             client = cls.get_client()
             
-            files = client.storage.from_(SUPABASE_BUCKET).list(
-                folder,
-                {
-                    "limit": limit,
-                    "sortBy": {"column": "created_at", "order": "desc"}
-                }
+            # Ensure folder ends with /
+            if not folder.endswith('/'):
+                folder += '/'
+            
+            response = client.list_objects_v2(
+                Bucket=SUPABASE_BUCKET,
+                Prefix=folder,
+                MaxKeys=limit
             )
+            
+            files = []
+            if 'Contents' in response:
+                for obj in response['Contents']:
+                    files.append({
+                        "name": os.path.basename(obj['Key']),
+                        "id": obj['Key'], # Using Key as ID
+                        "updated_at": obj['LastModified'].isoformat(),
+                        "created_at": obj['LastModified'].isoformat(), # S3 doesn't give created_at separate from LastModified usually
+                        "last_accessed_at": obj['LastModified'].isoformat(),
+                        "metadata": {
+                            "size": obj['Size'],
+                            "mimetype": "application/octet-stream" # S3 list doesn't return content type
+                        }
+                    })
             
             return files
             

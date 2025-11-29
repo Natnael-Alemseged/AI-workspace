@@ -160,6 +160,9 @@ class AttachmentData(BaseModel):
     filename: str
     size: int
     mime_type: str
+    
+    class Config:
+        extra = "ignore"  # Ignore extra fields like 'id' and 'created_at' from frontend
 
 
 class TopicMessageCreate(BaseModel):
@@ -238,59 +241,25 @@ class TopicMessageRead(BaseModel):
     is_deleted: bool
     deleted_at: Optional[datetime] = None
     created_at: datetime
-    
+
     # Attachments
     attachments: list[AttachmentRead] = Field(default_factory=list)
-    
-    # Sender info - populated from relationship
+
+    # Sender info
     sender_email: Optional[str] = None
     sender_full_name: Optional[str] = None
-    
-    # Mention and reaction counts
+
+    # Counts
     mention_count: Optional[int] = 0
     reaction_count: Optional[int] = 0
-    
-    # Reactions - full details
+
+    # Reactions
     reactions: list[ReactionSummary] = Field(default_factory=list)
-    
-    @model_validator(mode='before')
-    @classmethod
-    def populate_sender_info(cls, data):
-        """Populate sender info and reactions from relationships."""
-        if hasattr(data, 'sender') and data.sender:
-            # If data is an ORM model with sender relationship
-            if isinstance(data, dict):
-                return data
-            
-            # Group reactions by emoji
-            reactions_dict = {}
-            if hasattr(data, 'reactions') and data.reactions:
-                for reaction in data.reactions:
-                    emoji = reaction.emoji
-                    if emoji not in reactions_dict:
-                        reactions_dict[emoji] = {
-                            'emoji': emoji,
-                            'count': 0,
-                            'users': []
-                        }
-                    reactions_dict[emoji]['count'] += 1
-                    reactions_dict[emoji]['users'].append(reaction.user_id)
-            
-            # Extract sender info from ORM relationship
-            return {
-                **{k: getattr(data, k) for k in ['id', 'topic_id', 'sender_id', 'content', 'reply_to_id', 
-                                                   'is_edited', 'edited_at', 'is_deleted', 'deleted_at', 'created_at']},
-                'sender_email': getattr(data.sender, 'email', None),
-                'sender_full_name': getattr(data.sender, 'full_name', None),
-                'mention_count': len(data.mentions) if hasattr(data, 'mentions') and data.mentions else 0,
-                'reaction_count': len(data.reactions) if hasattr(data, 'reactions') and data.reactions else 0,
-                'reactions': list(reactions_dict.values()),
-            }
-        return data
-    
+
+    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
     class Config:
         from_attributes = True
-
+    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 
 class TopicMessageDetail(TopicMessageRead):
     """Detailed message info including mentions (reactions inherited from TopicMessageRead)."""
@@ -299,14 +268,14 @@ class TopicMessageDetail(TopicMessageRead):
 
 
 class MessageListResponse(BaseModel):
-    """Response for message list."""
-    messages: list[TopicMessageRead]
+    messages: list[TopicMessageRead]   # ← must be TopicMessageRead, not raw model
     total: int
     page: int
     page_size: int
     has_more: bool
 
-
+    class Config:
+        from_attributes = True  # optional, but safe
 # ============================================================================
 # Reaction Schemas
 # ============================================================================

@@ -108,6 +108,13 @@ SUPABASE_URL: str = config("SUPABASE_URL", default="")
 SUPABASE_KEY: str = config("SUPABASE_KEY", default="")
 SUPABASE_BUCKET: str = config("SUPABASE_BUCKET", default="chat-media")
 
+# Supabase S3 Configuration
+SUPABASE_S3_ACCESS_KEY_ID: str = config("SUPABASE_S3_ACCESS_KEY_ID", default="")
+SUPABASE_S3_SECRET_ACCESS_KEY: str = config("SUPABASE_S3_SECRET_ACCESS_KEY", default="")
+SUPABASE_S3_ENDPOINT_URL: str = config("SUPABASE_S3_ENDPOINT_URL", default="")
+SUPABASE_S3_REGION_NAME: str = config("SUPABASE_S3_REGION_NAME", default="")
+SUPABASE_PROJECT_REF: str = config("SUPABASE_PROJECT_REF", default="wijpuothbstqrbdalpta")
+
 # logging configuration
 LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
 logging.basicConfig(

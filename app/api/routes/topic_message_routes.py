@@ -40,6 +40,8 @@ async def create_topic_message(
         message = await TopicService.create_message(
             session, topic_id, message_data, current_user.id
         )
+
+        print('attachments:', message.attachments)
         
         # Notify topic members via Socket.IO
         await emit_to_room(
