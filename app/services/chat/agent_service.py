@@ -167,7 +167,7 @@ async def run_agent_stream(prompt: str, user_id: str, agent_type: str = None,top
             redis_client.set(persona_key, new_persona)
             logger.info(f"PERSONA CHANGED → {persona_key} = '{new_persona}'")
 
-            return f"Got it! From now on in **{topic_id.replace('_', ' ')}**, I am:\n\n**{display_persona}**"
+            return f"Got it!\n\n**{display_persona}**"
 
         # === STEP 2: Load current persona from Redis ===
         raw_persona = redis_client.get(persona_key)
