@@ -14,6 +14,7 @@ from llama_index.llms.groq import Groq
 
 from app.core.config import GROQ_API_KEY, GROK_API_KEY, COMPOSIO_API_KEY
 from app.services.memory_service import get_relevant_memories, add_memory
+from app.services.redis_client import redis_client
 from app.utils.ai_agent_parser import AgentType
 
 load_dotenv()
@@ -36,7 +37,7 @@ composio = Composio(api_key=COMPOSIO_API_KEY, provider=LlamaIndexProvider())
 email_tools = None
 search_tools = None
 
-async def get_tools(user_id: str, agent_type: str = None):
+async def get_tools(user_id: str, agent_type: str = None, topic_id:str = None):
     """
     Get tools for a specific agent type.
     
@@ -95,7 +96,7 @@ async def get_tools(user_id: str, agent_type: str = None):
         return all_tools
 
 
-async def run_agent_stream(prompt: str, user_id: str, agent_type: str = None):
+async def run_agent_stream(prompt: str, user_id: str, agent_type: str = None,topic_id: str = None):
     """
     Run the AI agent with the specified prompt.
     
@@ -107,7 +108,7 @@ async def run_agent_stream(prompt: str, user_id: str, agent_type: str = None):
     Returns:
         Agent response as string
     """
-    tools_list = await get_tools(user_id, agent_type)
+    tools_list = await get_tools(user_id, agent_type,topic_id)
 
     # FETCH RELEVANT MEMORIES
     memories = get_relevant_memories(user_id, prompt, limit=2)
@@ -131,13 +132,75 @@ async def run_agent_stream(prompt: str, user_id: str, agent_type: str = None):
             f"""Here are relevant contexts: {memory_context}"""
         )
     else:
-        agent_name = "Personal Assistant"
-        agent_description = "A smart agent that manages Gmail and search Composio tools."
-        system_prompt = (
-            f"""You are a helpful personal assistant that can manage emails and search the web. """
-            f"""Here are relevant contexts: {memory_context}"""
-        )
+        # === GENERAL AGENT WITH PERSONA + REDIS + TOPIC SUPPORT ===
+        import logging
+        logger = logging.getLogger("demo")
 
+        # Normalize topic_id
+        topic_id = (topic_id or "general").strip().lower().replace(" ", "_")
+        persona_key = f"persona:{user_id}:{topic_id}"
+
+        # === STEP 1: Check if user is trying to change persona ===
+        lower = prompt.lower().strip()
+        if any(trigger in lower for trigger in [
+            "act as", "be a ", "from now on", "change persona",
+            "set persona", "talk like", "respond as", "pretend to be"
+        ]) or lower.startswith("persona:"):
+            # Extract the persona description
+            if lower.startswith("persona:"):
+                new_persona = prompt.split(":", 1)[1].strip()
+            else:
+                # Grab everything after common triggers
+                for trigger in ["act as", "be a ", "talk like", "respond as", "pretend to be"]:
+                    if trigger in lower:
+                        new_persona = prompt.lower().split(trigger, 1)[1].strip()
+                        break
+                else:
+                    new_persona = prompt  # fallback
+
+            # Capitalize nicely for display
+            display_persona = new_persona.title()
+            if not display_persona.endswith((".", "!", "?")):
+                display_persona += "!"
+
+            # Save to Redis
+            redis_client.set(persona_key, new_persona)
+            logger.info(f"PERSONA CHANGED → {persona_key} = '{new_persona}'")
+
+            return f"Got it! From now on in **{topic_id.replace('_', ' ')}**, I am:\n\n**{display_persona}**"
+
+        # === STEP 2: Load current persona from Redis ===
+        raw_persona = redis_client.get(persona_key)
+        if raw_persona:
+            if isinstance(raw_persona, bytes):
+                raw_persona = raw_persona.decode("utf-8")
+            current_persona = raw_persona
+            logger.info(f"PERSONA LOADED from Redis → '{current_persona}'")
+        else:
+            current_persona = "A helpful, witty, and direct assistant."
+            logger.info("No persona found → using default")
+
+        # === STEP 3: Build dynamic system prompt with persona injected ===
+        system_prompt = f"""You are an AI assistant with a specific personality.
+
+        CURRENT PERSONA (YOU MUST OBEY THIS EXACTLY):
+        {current_persona}
+
+        RULES:
+        - Stay 100% in character. Never break role.
+        - Use the persona's tone, vocabulary, and style in every reply.
+        - You can use Gmail and web search tools when needed.
+        - Past conversation context:
+        {memory_context}
+
+        Now respond to the user naturally."""
+
+        agent_name = f"{current_persona.split('.')[0][:30]}"
+        agent_description = f"Assistant embodying: {current_persona[:100]}"
+
+        logger.info(f"Launching agent with persona: {current_persona[:60]}...")
+
+    # === REST OF YOUR CODE (unchanged) ===
     agent = FunctionAgent(
         name=agent_name,
         description=agent_description,
@@ -147,21 +210,9 @@ async def run_agent_stream(prompt: str, user_id: str, agent_type: str = None):
     )
 
     agent_output = await agent.run(prompt)
-
-    # Extract the actual text safely
     message = agent_output.response
-
-    # ← THIS IS THE ONLY LINE THAT MATTERS
     final_text = message.content if hasattr(message, 'content') else str(message)
 
-
-    add_memory(
-        user_id=user_id,
-        prompt=prompt,
-        response=final_text
-    )
-
-
-    print(f"Agent response ({agent_type or 'general'}):", final_text)
-    return final_text  # ← Always a string → JSON works 100%
-
+    add_memory(user_id=user_id, prompt=prompt, response=final_text)
+    print(f"Agent ({topic_id}):", final_text)
+    return final_text

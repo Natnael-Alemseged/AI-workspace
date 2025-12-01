@@ -10,7 +10,7 @@ GENERAL_AI_BOT_ID = UUID("00000000-0000-0000-0000-000000000003")
 AGENT_TYPE_TO_BOT_ID = {
     "emailAi": EMAIL_AI_BOT_ID,
     "searchAi": SEARCH_AI_BOT_ID,
-    "general": GENERAL_AI_BOT_ID,
+    "generalAi": GENERAL_AI_BOT_ID,
 }
 
 # Bot display names
@@ -31,14 +31,14 @@ BOT_AVATARS = {
 BOT_NAME_TO_AGENT_TYPE = {
     "Email AI": "emailAi",
     "Search AI": "searchAi",
-    "General AI": "general",
+    "General AI": "generalAi",
 }
 
 # Map bot emails to agent types
 BOT_EMAIL_TO_AGENT_TYPE = {
     "emailai@armada.bot": "emailAi",
     "searchai@armada.bot": "searchAi",
-    "generalai@armada.bot": "general",
+    "generalai@armada.bot": "generalAi",
 }
 
 

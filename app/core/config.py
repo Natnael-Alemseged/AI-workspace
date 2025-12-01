@@ -115,6 +115,9 @@ SUPABASE_S3_ENDPOINT_URL: str = config("SUPABASE_S3_ENDPOINT_URL", default="")
 SUPABASE_S3_REGION_NAME: str = config("SUPABASE_S3_REGION_NAME", default="")
 SUPABASE_PROJECT_REF: str = config("SUPABASE_PROJECT_REF", default="wijpuothbstqrbdalpta")
 
+
+REDIS_URL: str = config("REDIS_URL", default="")
+
 # logging configuration
 LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
 logging.basicConfig(

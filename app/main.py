@@ -13,9 +13,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.services.redis_client import redis_client
+
 
 def get_application() -> FastAPI:
     application = FastAPI(title=PROJECT_NAME, debug=DEBUG, version=VERSION)
+
+
+    # @application.on_event("startup")
+    # async def startup_event():
+    #     try:
+    #         redis_client.client.ping()
+    #         print("🚀 Redis connected successfully")
+    #     except Exception as e:
+    #         print("❌ Redis connection failed:", e)
+    #
+    # return application
 
     # Session middleware for OAuth (must be added before other middleware)
     application.add_middleware(

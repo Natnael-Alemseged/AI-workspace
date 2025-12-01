@@ -281,6 +281,7 @@ async def process_ai_topic_response(
         ai_response = await agent_service.run_agent_stream(
             prompt=prompt,
             user_id=str(user_id),
+            topic_id=str(topic_id),
             agent_type=agent_type
         )
         
