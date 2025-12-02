@@ -479,12 +479,9 @@ async def upload_media(
 ):
     """Upload media file to Supabase storage."""
     try:
-        # Read file content
-        content = await file.read()
-        
         # Upload to Supabase
         result = await SupabaseService.upload_file(
-            file_content=content,
+            file_obj=file.file,
             filename=file.filename,
             content_type=file.content_type,
             folder=f"chat/{current_user.id}"

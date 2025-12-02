@@ -404,12 +404,9 @@ async def upload_topic_media(
                 detail="User is not a member of this topic"
             )
         
-        # Read file content
-        content = await file.read()
-        
         # Upload to Supabase
         result = await SupabaseService.upload_file(
-            file_content=content,
+            file_obj=file.file,
             filename=file.filename,
             content_type=file.content_type,
             folder=f"topics/{topic_id}/{current_user.id}"

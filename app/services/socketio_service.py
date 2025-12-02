@@ -322,29 +322,16 @@ async def send_message(sid, data):
                 
                 await session.commit()
                 
-                # Send push notifications to offline users
+                # Send push notifications to offline users (Offloaded to background task)
                 if offline_user_ids and topic:
-                    for offline_user_id in offline_user_ids:
-                        # Get push subscriptions for offline user
-                        subs_result = await session.execute(
-                            select(PushSubscription).where(
-                                PushSubscription.user_id == offline_user_id
-                            )
-                        )
-                        subscriptions = subs_result.scalars().all()
-                        
-                        # Send notification to each subscription
-                        message_preview = message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
-                        
-                        for subscription in subscriptions:
-                            # Pass FCM token directly
-                            await notification_service.send_message_notification(
-                                subscription_info=subscription.endpoint,
-                                sender_name=sender_name,
-                                message_preview=message_preview,
-                                topic_name=topic.name,
-                                topic_id=str(topic_id)
-                            )
+                    import asyncio
+                    asyncio.create_task(send_push_notifications_batch(
+                        offline_user_ids,
+                        sender_name,
+                        message_data,
+                        topic.name,
+                        str(topic_id)
+                    ))
         
         # Broadcast message to room (for users currently in the topic)
         await sio.emit(
@@ -370,29 +357,40 @@ async def send_message(sid, data):
         # Broadcast global alert to all topic members' personal rooms
         if topic_id:
             async with AsyncSessionLocal() as session:
-                # Get sender info for the alert
-                sender_result = await session.execute(
-                    select(User).where(User.id == uuid.UUID(user_id))
-                )
-                sender = sender_result.scalar_one_or_none()
-                sender_name = sender.full_name or sender.email if sender else "Someone"
+                # Get sender info for the alert (if not already fetched)
+                # We can reuse sender_name from above if available, but for safety inside this block:
+                # Ideally we should have fetched this once.
+                # Re-fetching to be safe with session scope if needed, but we can optimize.
+                # Let's assume we can reuse sender_name if we passed it, but here we are in a new block?
+                # Actually, we can just do the alert broadcasting here.
                 
-                # Get all topic members
+                # Optimization: We already have topic_members from above.
+                # But we need to be careful about session attachment.
+                # Let's just re-fetch members for simplicity or pass them if we refactor.
+                # To keep it simple and safe, let's re-fetch or just iterate if we have IDs.
+                
+                # Let's optimize by NOT re-fetching everything if possible.
+                # But `topic_members` objects are bound to the previous session which is closed.
+                # So we need to re-fetch or use IDs.
+                
+                # Let's just emit to the rooms we know.
+                # We have offline_user_ids, but we need ALL members except sender.
+                
+                # Let's do a quick query for IDs only to be fast.
                 result = await session.execute(
-                    select(TopicMember).where(TopicMember.topic_id == uuid.UUID(topic_id))
+                    select(TopicMember.user_id).where(TopicMember.topic_id == uuid.UUID(topic_id))
                 )
-                topic_members = result.scalars().all()
+                member_ids = result.scalars().all()
                 
-                # Emit global alert to each member's personal room
                 message_preview = message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
                 
-                for member in topic_members:
+                for member_id in member_ids:
                     # Skip the sender
-                    if str(member.user_id) == user_id:
+                    if str(member_id) == user_id:
                         continue
                     
                     # Emit to user's personal room
-                    member_room = f"user_{member.user_id}"
+                    member_room = f"user_{member_id}"
                     await sio.emit(
                         "global_message_alert",
                         {
@@ -408,6 +406,40 @@ async def send_message(sid, data):
     except Exception as e:
         logger.error(f"Error in send_message handler: {e}")
         await sio.emit("error", {"message": str(e)}, room=sid)
+
+
+async def send_push_notifications_batch(user_ids, sender_name, message_data, topic_name, topic_id):
+    """Helper to send push notifications in background."""
+    try:
+        async with AsyncSessionLocal() as session:
+            # Batch fetch subscriptions
+            stmt = select(PushSubscription).where(PushSubscription.user_id.in_(user_ids))
+            result = await session.execute(stmt)
+            subscriptions = result.scalars().all()
+            
+            if not subscriptions:
+                return
+
+            message_preview = message_data.get("content", "")[:100] if isinstance(message_data, dict) else str(message_data)[:100]
+            
+            # Send notifications (concurrently if possible, or sequential but in background)
+            # notification_service.send_message_notification is async
+            
+            tasks = []
+            for subscription in subscriptions:
+                tasks.append(notification_service.send_message_notification(
+                    subscription_info=subscription.endpoint,
+                    sender_name=sender_name,
+                    message_preview=message_preview,
+                    topic_name=topic_name,
+                    topic_id=topic_id
+                ))
+            
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+                
+    except Exception as e:
+        logger.error(f"Error in background push notifications: {e}")
 
 
 @sio.event

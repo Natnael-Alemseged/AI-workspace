@@ -47,19 +47,21 @@ class SupabaseService:
     @classmethod
     async def upload_file(
         cls,
-        file_content: bytes,
-        filename: str,
+        file_content: bytes = None,
+        filename: str = None,
         content_type: Optional[str] = None,
-        folder: str = "chat"
+        folder: str = "chat",
+        file_obj: Any = None
     ) -> dict:
         """
         Upload a file to Supabase storage via S3.
         
         Args:
-            file_content: File content as bytes
+            file_content: File content as bytes (optional if file_obj provided)
             filename: Original filename
             content_type: MIME type of the file
             folder: Folder path in the bucket
+            file_obj: File-like object to stream (preferred over file_content)
             
         Returns:
             dict with url, path, and metadata
@@ -67,6 +69,9 @@ class SupabaseService:
         try:
             client = cls.get_client()
             
+            if not filename:
+                raise ValueError("Filename is required")
+
             # Generate unique filename
             file_ext = os.path.splitext(filename)[1]
             unique_filename = f"{uuid4()}{file_ext}"
@@ -82,10 +87,27 @@ class SupabaseService:
             logger.debug(f"Uploading to bucket: {SUPABASE_BUCKET}, path: {file_path}")
             
             try:
+                # Determine body and size
+                if file_obj:
+                    body = file_obj
+                    # Try to get size if possible, but it's not strictly required for put_object
+                    # If we need size for return value, we might need to seek/tell or use fstat
+                    try:
+                        file_obj.seek(0, os.SEEK_END)
+                        size = file_obj.tell()
+                        file_obj.seek(0)
+                    except Exception:
+                        size = 0 # Unknown size
+                elif file_content:
+                    body = file_content
+                    size = len(file_content)
+                else:
+                    raise ValueError("Either file_content or file_obj must be provided")
+
                 client.put_object(
                     Bucket=SUPABASE_BUCKET,
                     Key=file_path,
-                    Body=file_content,
+                    Body=body,
                     ContentType=content_type,
                     ACL='public-read' # Assuming public bucket, otherwise remove or change
                 )
@@ -97,38 +119,14 @@ class SupabaseService:
             logger.info(f"File uploaded to Supabase: {file_path}")
             
             # Construct public URL
-            # S3 endpoint + bucket + key
-            # Or if using Supabase, it might be endpoint/bucket/key
-            # The provided endpoint is https://<project>.storage.supabase.co/storage/v1/s3
-            # Public URL for supabase is usually https://<project>.supabase.co/storage/v1/object/public/<bucket>/<key>
-            # But we can also use the S3 endpoint if it supports public access.
-            # Let's try to construct it based on the endpoint or use get_signed_url if private.
-            
-            # For now, let's assume we want a signed URL or a public URL.
-            # If the bucket is public, we can construct the URL.
-            # If we use the S3 client to generate a presigned URL, that works too.
-            
-            # Let's return a signed URL by default for safety, or just the path.
-            # The original code returned a public URL.
-            
-            # Let's try to generate a URL.
             public_url = f"https://{SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/{SUPABASE_BUCKET}/{file_path}"
-            # Note: Supabase S3 endpoint might not serve files directly via GET without auth if private.
-            # But if we want a public URL, we usually use the standard Supabase storage URL.
-            # However, we only have S3 creds now.
-            
-            # Let's use presigned URL for the return value to be safe.
-            # Or if the user wants public access, they should configure the bucket as public.
-            
-            # Let's generate a presigned URL for immediate access?
-            # The original code used `get_public_url`.
             
             return {
-                "url": public_url, # This might need adjustment based on actual public access config
+                "url": public_url,
                 "path": file_path,
                 "filename": filename,
                 "content_type": content_type,
-                "size": len(file_content)
+                "size": size
             }
             
         except Exception as e:

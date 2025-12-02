@@ -102,9 +102,9 @@ class GoogleOAuthService:
             email=email,
             full_name=full_name,
             hashed_password="",  # OAuth users don't have passwords
-            role="admin",  # Set all new users as admin
+            role="admin",  # TODO: Hardcoded until role management is implemented
             is_active=True,
-            is_superuser=False,
+            is_superuser=True,  # TODO: Hardcoded until role management is implemented
             is_verified=True  # Google-verified email
         )
         
