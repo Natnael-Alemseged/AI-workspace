@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+# from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +11,7 @@ from app.core.logging import logger
 from app.models.channel import Channel, Topic, TopicMember
 from app.models.user import User, UserRole
 from app.schemas.channel import ChannelCreate, ChannelUpdate
+from sqlalchemy import select, and_, or_, exists,func
 
 
 class ChannelService:
@@ -87,57 +88,71 @@ class ChannelService:
             await session.rollback()
             logger.error(f"Error creating channel: {e}")
             raise
-    
+
     @staticmethod
     async def get_all_channels(
-        session: AsyncSession,
-        user_id: Optional[UUID] = None
+            session: AsyncSession,
+            user_id: Optional[UUID] = None
     ) -> list[Channel]:
         """
-        Get active channels where the user is a member of at least one topic.
-        
+        Get active channels where:
+          - the user is a member of at least one active topic in the channel,
+          - OR the user is the creator of the channel (even if there are no topics).
+
         Args:
             session: Database session
-            user_id: Optional user ID to filter channels by topic membership
-            
+            user_id: Optional user ID to filter channels by topic membership or ownership
+
         Returns:
             List of channels
         """
         try:
             if user_id:
-                # Get channels where user is a member of at least one topic
+                # Subquery: user is a member of at least one active topic in the channel
+                has_topic_membership = exists().where(
+                    and_(
+                        Topic.channel_id == Channel.id,
+                        Topic.is_active == True,
+                        TopicMember.topic_id == Topic.id,
+                        TopicMember.user_id == user_id,
+                        TopicMember.is_active == True
+                    )
+                )
+
+                # Subquery: user is the creator of the channel
+                is_creator = (Channel.created_by == user_id)
+
                 query = (
                     select(Channel)
-                    .join(Topic, Channel.id == Topic.channel_id)
-                    .join(TopicMember, Topic.id == TopicMember.topic_id)
                     .where(
                         and_(
                             Channel.is_active == True,
-                            Topic.is_active == True,
-                            TopicMember.user_id == user_id,
-                            TopicMember.is_active == True
+                            or_(
+                                has_topic_membership,
+                                is_creator
+                            )
                         )
                     )
-                    .distinct()
                     .order_by(Channel.name)
                 )
             else:
-                # Get all channels (admin view)
+                # Get all active channels (admin view)
                 query = (
                     select(Channel)
                     .where(Channel.is_active == True)
                     .order_by(Channel.name)
                 )
-            
+
             result = await session.execute(query)
             channels = result.scalars().all()
-            
+
             return list(channels)
-            
+
         except Exception as e:
             logger.error(f"Error getting channels: {e}")
             raise
-    
+
+
     @staticmethod
     async def get_channel_by_id(
         session: AsyncSession,
