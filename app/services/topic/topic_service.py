@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.channel import MessageReaction, Topic, TopicMember, TopicMessage
-from app.schemas.channel import TopicCreate, TopicMessageCreate, TopicUpdate
+from app.schemas.channel import ReactionSummary, TopicCreate, TopicMessageCreate, TopicUpdate
 from app.services.topic.topic_management_service import TopicManagementService
 from app.services.topic.topic_member_service import TopicMemberService
 from app.services.topic.topic_message_service import TopicMessageService
@@ -192,6 +192,15 @@ class TopicService:
     ) -> bool:
         """Remove a reaction from a message."""
         return await TopicReactionService.remove_reaction(session, message_id, user_id, emoji)
+    
+    @staticmethod
+    async def get_reaction_summary(
+        session: AsyncSession,
+        message_id: UUID,
+        current_user_id: UUID
+    ) -> list[ReactionSummary]:
+        """Get reaction summary for a message grouped by emoji."""
+        return await TopicReactionService.get_reaction_summary(session, message_id, current_user_id)
 
     @staticmethod
     async def delete_topic_by_id(

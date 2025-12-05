@@ -20,6 +20,11 @@ from app.models.chat import (
     MessageType,
 )
 from app.models.conversation import Conversation
+from app.models.direct_message import (
+    DirectMessage,
+    DirectMessageAttachment,
+    DirectMessageReaction,
+)
 from app.models.gmail import EmailAttachment, GmailDraft, GmailDraftStatus
 from app.models.memory import MemoryChunk, SourceType
 from app.models.message import ContentType, Message, MessageCitation, MessageRole
@@ -69,4 +74,8 @@ __all__ = [
     "TopicMessageAttachment",
     "MessageMention",
     "MessageReaction",
+    # Direct Message models
+    "DirectMessage",
+    "DirectMessageReaction",
+    "DirectMessageAttachment",
 ]

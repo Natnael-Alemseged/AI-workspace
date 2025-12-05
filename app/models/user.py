@@ -34,6 +34,7 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_online = Column(Boolean, default=False, nullable=False)
     last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    is_bot = Column(Boolean, default=False, nullable=False)  # Indicates if user is a bot
     
     # Relationships
     oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")

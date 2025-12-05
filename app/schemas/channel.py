@@ -271,7 +271,23 @@ class TopicMessageRead(BaseModel):
             result['sender_full_name'] = getattr(data.sender, 'full_name', None)
             result['mention_count'] = len(data.mentions) if hasattr(data, 'mentions') and data.mentions else 0
             result['reaction_count'] = len(data.reactions) if hasattr(data, 'reactions') and data.reactions else 0
-            result['reactions'] = []
+            
+            # Group reactions by emoji
+            reaction_map = {}
+            if hasattr(data, 'reactions') and data.reactions:
+                for reaction in data.reactions:
+                    emoji = reaction.emoji
+                    if emoji not in reaction_map:
+                        reaction_map[emoji] = {
+                            'emoji': emoji,
+                            'count': 0,
+                            'users': [],
+                            'user_reacted': False
+                        }
+                    reaction_map[emoji]['count'] += 1
+                    reaction_map[emoji]['users'].append(reaction.user_id)
+            
+            result['reactions'] = list(reaction_map.values())
             return result
         return data
 

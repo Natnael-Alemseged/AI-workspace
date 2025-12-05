@@ -120,6 +120,17 @@ async def get_topic_messages(
             session, topic_id, current_user.id, page, page_size
         )
         
+        # Update reactions with user_reacted field for each message
+        for message in messages:
+            if hasattr(message, 'reactions') and message.reactions:
+                # Get proper reaction summary with user_reacted field
+                reactions = await TopicService.get_reaction_summary(
+                    session=session,
+                    message_id=message.id,
+                    current_user_id=current_user.id
+                )
+                message.reactions = reactions
+        
         has_more = (page * page_size) < total
         
         return MessageListResponse(

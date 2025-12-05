@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import logger
 from app.models.channel import MessageReaction
+from app.schemas.channel import ReactionSummary
 
 
 class TopicReactionService:
@@ -90,4 +91,55 @@ class TopicReactionService:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error removing reaction: {e}")
+            raise
+    
+    @staticmethod
+    async def get_reaction_summary(
+        session: AsyncSession,
+        message_id: UUID,
+        current_user_id: UUID
+    ) -> list[ReactionSummary]:
+        """
+        Get reaction summary for a message grouped by emoji.
+        
+        Args:
+            session: Database session
+            message_id: Message ID
+            current_user_id: Current user ID to check if they reacted
+            
+        Returns:
+            List of reaction summaries grouped by emoji
+        """
+        try:
+            # Get all reactions for the message
+            query = select(MessageReaction).where(
+                MessageReaction.message_id == message_id
+            )
+            result = await session.execute(query)
+            reactions = result.scalars().all()
+            
+            # Group by emoji
+            emoji_map = {}
+            for reaction in reactions:
+                if reaction.emoji not in emoji_map:
+                    emoji_map[reaction.emoji] = {
+                        'emoji': reaction.emoji,
+                        'count': 0,
+                        'users': [],
+                        'user_reacted': False
+                    }
+                
+                emoji_map[reaction.emoji]['count'] += 1
+                emoji_map[reaction.emoji]['users'].append(reaction.user_id)
+                
+                if reaction.user_id == current_user_id:
+                    emoji_map[reaction.emoji]['user_reacted'] = True
+            
+            return [
+                ReactionSummary(**data) 
+                for data in emoji_map.values()
+            ]
+            
+        except Exception as e:
+            logger.error(f"Error getting reaction summary: {e}")
             raise
