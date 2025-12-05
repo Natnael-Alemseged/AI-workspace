@@ -447,7 +447,19 @@ class DirectMessageService:
             message.is_edited = True
             message.edited_at = datetime.utcnow()
             await session.commit()
-            await session.refresh(message)
+            
+            # Reload message with all relationships
+            result = await session.execute(
+                select(DirectMessage).where(
+                    DirectMessage.id == message_id
+                ).options(
+                    selectinload(DirectMessage.sender),
+                    selectinload(DirectMessage.receiver),
+                    selectinload(DirectMessage.attachments),
+                    selectinload(DirectMessage.reactions)
+                )
+            )
+            message = result.scalar_one()
         
         return message
     
