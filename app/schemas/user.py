@@ -1,5 +1,6 @@
 import uuid
 from typing import List, Optional
+from datetime import datetime
 
 from fastapi_users import schemas
 from pydantic import BaseModel, ConfigDict
@@ -12,6 +13,7 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     
     full_name: Optional[str] = None
     role: UserRole
+    is_approved: bool
 
 
 class UserCreate(schemas.BaseUserCreate):
@@ -55,3 +57,43 @@ class UserListResponse(BaseModel):
     page: int
     page_size: int
     has_more: bool
+
+
+# Admin-specific schemas
+class PendingUserRead(BaseModel):
+    """Schema for pending user information."""
+    id: uuid.UUID
+    email: str
+    full_name: Optional[str] = None
+    created_at: datetime
+    is_verified: bool
+    registration_method: str  # "email" or "oauth"
+    
+    class Config:
+        from_attributes = True
+
+
+class UserApprovalUpdate(BaseModel):
+    """Schema for approving a user."""
+    pass  # No body needed, approval is triggered by endpoint
+
+
+class UserPromoteUpdate(BaseModel):
+    """Schema for promoting a user to superuser."""
+    pass  # No body needed, promotion is triggered by endpoint
+
+
+class AdminUserRead(BaseModel):
+    """Schema for admin user listing."""
+    id: uuid.UUID
+    email: str
+    full_name: Optional[str] = None
+    role: str
+    is_active: bool
+    is_superuser: bool
+    is_approved: bool
+    is_verified: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

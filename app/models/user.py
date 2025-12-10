@@ -30,11 +30,13 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
+    is_approved = Column(Boolean, default=False, nullable=False)  # Admin approval status
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_online = Column(Boolean, default=False, nullable=False)
     last_seen_at = Column(DateTime(timezone=True), nullable=True)
     is_bot = Column(Boolean, default=False, nullable=False)  # Indicates if user is a bot
+
     
     # Relationships
     oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")

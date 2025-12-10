@@ -148,7 +148,10 @@ async def login(
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
     if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=400, detail="Account pending approval. Please contact an administrator.")
+    
+    if not user.is_approved:
+        raise HTTPException(status_code=400, detail="Account pending approval. Please contact an administrator.")
     
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -194,10 +197,11 @@ async def register(
         email=user_data.email.lower(),
         full_name=user_data.full_name,
         hashed_password=hashed_password,
-        role="admin",  # TODO: Hardcoded until role management is implemented
-        is_active=True,
-        is_superuser=True,  # TODO: Hardcoded until role management is implemented
-        is_verified=False
+        role="user",  # Default role, will be upgraded to admin upon approval
+        is_active=False,  # Inactive until approved by admin
+        is_superuser=False,
+        is_verified=False,
+        is_approved=False  # Requires admin approval
     )
     
     session.add(new_user)
