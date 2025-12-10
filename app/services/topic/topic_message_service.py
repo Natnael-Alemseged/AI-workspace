@@ -82,6 +82,12 @@ class TopicMessageService:
             session.add(message)
             await session.flush()
             
+            # Update sender's read status to prevent unread indicator for own message
+            await session.refresh(message, ["created_at"])
+            member.last_read_at = message.created_at
+            member.unread_count = 0
+            session.add(member)
+            
             # Create attachment records if any
             if message_data.attachments:
                 for attachment_data in message_data.attachments:
