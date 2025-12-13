@@ -386,7 +386,46 @@ async def process_ai_topic_response(
 # Media Upload Endpoints
 # ============================================================================
 
-@router.post("/topics/{topic_id}/upload", response_model=MediaUploadResponse)
+
+@router.post("/topics/{upload_namespace}/upload", response_model=MediaUploadResponse)
+async def upload_dm_media(
+    upload_namespace: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload media file for direct messages to Supabase storage."""
+    try:
+        upload_namespace = upload_namespace.strip()
+        if not upload_namespace:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid upload namespace"
+            )
+
+        result = await SupabaseService.upload_file(
+            file_obj=file.file,
+            filename=file.filename,
+            content_type=file.content_type,
+            folder=f"{upload_namespace}/{current_user.id}"
+        )
+
+        logger.info(f"DM media uploaded: {result['filename']}")
+
+        return MediaUploadResponse(
+            url=result["url"],
+            filename=result["filename"],
+            size=result["size"],
+            mime_type=result["content_type"]
+        )
+
+    except Exception as e:
+        logger.error(f"Error uploading DM media: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload media"
+        )
+
+@router.post("/topics/{topic_id:uuid}/upload", response_model=MediaUploadResponse)
 async def upload_topic_media(
     topic_id: UUID,
     file: UploadFile = File(...),

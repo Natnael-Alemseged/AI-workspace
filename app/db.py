@@ -71,7 +71,7 @@ async def get_async_session() -> AsyncIterator[AsyncSession]:
             logger.debug("Async DB session opened")
             yield session
         except Exception as exc:
-            logger.error(f"Database session error: {exc}", exc_info=True)
+            logger.opt(exception=True).error("Database session error: {}", exc)
             await session.rollback()
             raise
         finally:

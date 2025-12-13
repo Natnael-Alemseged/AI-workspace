@@ -39,7 +39,7 @@ class SupabaseService:
                 aws_secret_access_key=SUPABASE_S3_SECRET_ACCESS_KEY,
                 endpoint_url=SUPABASE_S3_ENDPOINT_URL,
                 region_name=SUPABASE_S3_REGION_NAME,
-                config=BotoConfig(signature_version='s3v4')
+                config=BotoConfig(signature_version='s3v4', s3={'addressing_style': 'path'})
             )
             logger.info("Supabase S3 client initialized")
         return cls._client
@@ -109,12 +109,23 @@ class SupabaseService:
                     Key=file_path,
                     Body=body,
                     ContentType=content_type,
-                    ACL='public-read' # Assuming public bucket, otherwise remove or change
                 )
             except ClientError as e:
                 logger.error(f"Upload failed - Bucket: {SUPABASE_BUCKET}, Path: {file_path}")
+                error_code = None
+                error_message = None
+                try:
+                    error_code = (e.response or {}).get("Error", {}).get("Code")
+                    error_message = (e.response or {}).get("Error", {}).get("Message")
+                except Exception:
+                    error_code = None
+                    error_message = None
                 logger.error(f"Upload error details: {str(e)}")
-                raise ValueError(f"Failed to upload file to Supabase storage: {str(e)}")
+                raise ValueError(
+                    "Failed to upload file to Supabase storage"
+                    + (f" (code={error_code})" if error_code else "")
+                    + (f": {error_message}" if error_message else "")
+                )
             
             logger.info(f"File uploaded to Supabase: {file_path}")
             

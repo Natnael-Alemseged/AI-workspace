@@ -17,9 +17,9 @@ from sqlalchemy.orm import relationship
 
 from app.db import Base
 
-
+"""Direct message model for private one-to-one conversations."""
 class DirectMessage(Base):
-    """Direct message model for private one-to-one conversations."""
+
     
     __tablename__ = "direct_messages"
     
