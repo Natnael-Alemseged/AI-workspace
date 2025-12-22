@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import SECRET_KEY, ALGORITHM
 from app.db import get_async_session
+from app.core.security import get_password_hash
 from app.models.user import User
 from app.models.chat import ChatRoom, ChatRoomMember, ChatMessage, MessageReadReceipt, ChatRoomType
 from app.schemas.user import UserRead, UserUpdate, UserListResponse, UserListItem, LastMessageInfo
@@ -118,6 +119,13 @@ async def update_current_user(
     # Update user fields
     update_data = user_update.dict(exclude_unset=True)
     
+    # Handle password hashing
+    if "password" in update_data:
+        password = update_data.pop("password")
+        if password:
+            current_user.hashed_password = get_password_hash(password)
+    
+    # Apply other fields
     for field, value in update_data.items():
         setattr(current_user, field, value)
     

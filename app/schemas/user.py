@@ -20,7 +20,7 @@ class UserCreate(schemas.BaseUserCreate):
     full_name: Optional[str] = None
 
 
-class UserUpdate(schemas.BaseUserUpdate):
+class UserUpdate(BaseModel):
     password: Optional[str] = None
     full_name: Optional[str] = None
 
