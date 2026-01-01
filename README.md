@@ -1,6 +1,6 @@
-# Armada Den Backend
+# AI Workspace Backend
 
-**Armada Den** is a powerful backend API built with **FastAPI**, designed to support real-time applications with features like chat, notifications, and AI bot integration.
+**AI Workspace** is a powerful backend API built with **FastAPI**, designed to support real-time applications with features like chat, notifications, and AI bot integration.
 
 ## 🚀 Features
 
