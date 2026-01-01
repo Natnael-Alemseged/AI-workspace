@@ -38,7 +38,7 @@ class FCMService:
 
             # Path to service account key
             # Try to find the file in the root directory
-            cred_file = "h-armada-den-firebase-adminsdk-fbsvc-c3c1e4a6b5.json"
+            cred_file = "firebase-service-account.json"
             
             # Check if file exists
             if not os.path.exists(cred_file):
