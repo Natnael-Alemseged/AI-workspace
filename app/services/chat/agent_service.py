@@ -6,11 +6,9 @@ import os
 from dotenv import load_dotenv
 from composio import Composio
 from composio_llamaindex import LlamaIndexProvider
-from groq import Groq
+# Use OpenAILike for better compatibility with Groq's specialized models
 from llama_index.llms.openai_like import OpenAILike
-
 from llama_index.core.agent.workflow import FunctionAgent
-from llama_index.llms.groq import Groq
 
 from app.core.config import GROQ_API_KEY, GROK_API_KEY, COMPOSIO_API_KEY
 from app.services.memory_service import get_relevant_memories, add_memory
@@ -19,16 +17,15 @@ from app.utils.ai_agent_parser import AgentType
 
 load_dotenv()
 
-# Initialize LLM (Grok in this case, could be OpenAI if you swap)
-llm = Groq(
-    # model="grok-4-0709",
+# Initialize LLM (using OpenAILike for Groq's newer models to bypass specialized class validation)
+llm = OpenAILike(
     model="openai/gpt-oss-120b",
+    api_base="https://api.groq.com/openai/v1",
 
-    # api_base="https://api.x.ai/v1",
     api_key=GROQ_API_KEY,
-    # context_window=128000,
-    # is_chat_model=True,
-    # is_function_calling_model=True,
+    is_chat_model=True,
+    is_function_calling_model=True,
+    # context_window=131072, # Optional: set according to model specs
 )
 # Initialize Composio with LlamaIndex provider
 composio = Composio(api_key=COMPOSIO_API_KEY, provider=LlamaIndexProvider())
@@ -108,7 +105,7 @@ async def get_tools(user_id: str, agent_type: str = None, topic_id:str = None):
                 if tk == "composio_search":
                     active_toolkits.append(tk)
                     continue
-                
+
                 if tk in connected_slugs:
                     active_toolkits.append(tk)
                 else:
@@ -279,6 +276,12 @@ async def run_agent_stream(prompt: str, user_id: str, agent_type: str = None,top
         logger.info(f"Launching agent with persona: {current_persona[:60]}...")
 
     # === REST OF YOUR CODE (unchanged) ===
+    # Safeguard: Groq has a limit on the number of tools (usually 128). 
+    # Capping at 100 to be safe and avoid the 'maximum number of items is 128' error.
+    if len(tools_list) > 100:
+        print(f"⚠️ Warning: Truncating tools from {len(tools_list)} to 100 for Groq compatibility")
+        tools_list = tools_list[:100]
+
     agent = FunctionAgent(
         name=agent_name,
         description=agent_description,

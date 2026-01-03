@@ -355,7 +355,7 @@ async def process_ai_topic_response(
             logger.info(f"AI {agent_type} replied to message {reply_to_message_id}")
             
     except Exception as e:
-        logger.error(f"Error processing AI topic response: {e}", exc_info=True)
+        logger.error("Error processing AI topic response: {error}", error=str(e), exc_info=True)
         
         # Emit error to topic
         try:
